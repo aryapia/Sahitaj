@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Shahi Taj - Automated ERP & Master Management Portal</title>
+  <title>Sahi Taj - ERP & Master Management Portal</title>
   <!-- Tailwind CSS -->
   <script src="https://cdn.tailwindcss.com"></script>
   <!-- Google Fonts Inter -->
@@ -26,17 +26,30 @@
   <div id="root"></div>
 
   <script type="text/babel">
-    const { useState, useMemo, useEffect } = React;
+    const { useState, useMemo, useEffect, useRef } = React;
 
     // --- CONFIGURE SUPABASE CREDENTIALS HERE ---
     const SUPABASE_URL = 'https://iusblrlthsmmxsyxwyss.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_5FXaUCAeEf0nbS-I1NkSew_1ae-lKZ6';
     
+    
+
+
+
     const supabase = (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') 
         ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
         : null;
 
     // --- INITIAL MOCK DATA FALLBACKS ---
+    const INITIAL_USERS = [
+      { id: 1, username: 'admin', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Admin', worker_id: null },
+      { id: 2, username: 'surendra', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-01' },
+      { id: 3, username: 'ramesh', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-02' },
+      { id: 4, username: 'mohan', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-03' },
+      { id: 5, username: 'bheru', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-04' },
+      { id: 6, username: 'nathu', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-05' }
+    ];
+
     const INITIAL_INVENTORY = [
       { id: 'RM-01', name: 'Cotton Base Fabric (Pure Saffron)', unit: 'Meters', stock: 1200, minAlert: 200, category: 'Fabric' },
       { id: 'RM-02', name: 'Marwari Velvet Trim Band', unit: 'Meters', stock: 450, minAlert: 100, category: 'Fabric' },
@@ -61,11 +74,11 @@
     ];
 
     const INITIAL_WORKERS = [
-      { id: 'WKR-01', name: 'Surendra Ji', role: 'Master Craftsman', phone: '+91 98290 11111', skillLevel: 'Master Artisan' },
-      { id: 'WKR-02', name: 'Ramesh Ji', role: 'Stitching Specialist', phone: '+91 94140 22222', skillLevel: 'Senior Specialist' },
-      { id: 'WKR-03', name: 'Mohan Lal', role: 'Craftsman', phone: '+91 97850 33333', skillLevel: 'Craftsman' },
-      { id: 'WKR-04', name: 'Bheru Singh', role: 'Embellishment Master', phone: '+91 91660 44444', skillLevel: 'Master Artisan' },
-      { id: 'WKR-05', name: 'Nathu Lal', role: 'Dyeing & Pleating Specialist', phone: '+91 99280 55555', skillLevel: 'Senior Specialist' }
+      { id: 'WKR-01', name: 'Surendra Ji', role: 'Master Craftsman', phone: '+91 98290 11111', skillLevel: 'Master Artisan', monthlyCapacity: 75 },
+      { id: 'WKR-02', name: 'Ramesh Ji', role: 'Stitching Specialist', phone: '+91 94140 22222', skillLevel: 'Senior Specialist', monthlyCapacity: 75 },
+      { id: 'WKR-03', name: 'Mohan Lal', role: 'Craftsman', phone: '+91 97850 33333', skillLevel: 'Craftsman', monthlyCapacity: 75 },
+      { id: 'WKR-04', name: 'Bheru Singh', role: 'Embellishment Master', phone: '+91 91660 44444', skillLevel: 'Master Artisan', monthlyCapacity: 75 },
+      { id: 'WKR-05', name: 'Nathu Lal', role: 'Dyeing & Pleating Specialist', phone: '+91 99280 55555', skillLevel: 'Senior Specialist', monthlyCapacity: 75 }
     ];
 
     const INITIAL_WORKER_SKILLS = [
@@ -97,33 +110,169 @@
       }
     ];
 
+    // INITIAL PROGRESS CHUNKS LOGS (FOR IMMUTABLE TASK RECORD MODEL)
+    const INITIAL_PROGRESS_BATCHES = [
+      { id: 101, task_id: 'TSK-1001', pieces_completed: 30, created_at: '2026-10-29 10:00:00', notes: 'Initial batch completed cleanly.' },
+      { id: 102, task_id: 'TSK-1001', pieces_completed: 20, created_at: '2026-10-30 16:30:00', notes: 'Final batch completed and verified.' },
+      { id: 103, task_id: 'TSK-1002', pieces_completed: 15, created_at: '2026-10-31 11:15:00', notes: 'First half completed.' }
+    ];
+
+    // Helper for SHA-256 password hashing
+    async function hashPassword(str) {
+      const msgBuffer = new TextEncoder().encode(str);
+      const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+    }
+
     function App() {
-      // Data Source Mode
-      const [dataSourceMode, setDataSourceMode] = useState('mock');
+	
+	// --- OPENAI DEMO KEY PLACEHOLDER ---
+    // You can set your OpenAI API key here for direct LLM processing during demo
+    const OPENAI_API_KEY = '';
+	
+	const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      const speechRecognizer = SpeechRecognition ? new SpeechRecognition() : null;
+      if (speechRecognizer) {
+        speechRecognizer.lang = 'hi-IN';
+        speechRecognizer.continuous = false;
+        speechRecognizer.interimResults = false;
+      }
+	  
+	  // Function to record microphone audio and transcribe via OpenAI Whisper API
+const handleWhisperVoiceInput = async () => {
+  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'YOUR_OPENAI_API_KEY_HERE') {
+    alert('Please insert your OpenAI API key in the OPENAI_API_KEY variable first.');
+    return;
+  }
+
+  try {
+  
+    // Request microphone access
+    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    const mediaRecorder = new MediaRecorder(stream);
+    let audioChunks = [];
+
+    mediaRecorder.ondataavailable = (event) => {
+      if (event.data.size > 0) {
+        audioChunks.push(event.data);
+      }
+    };
+
+    mediaRecorder.onstop = async () => {
+      // Create audio blob from recorded chunks
+      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+      const audioFile = new File([audioBlob], 'voice_prompt.webm', { type: 'audio/webm' });
+
+      // Prepare Form Data for OpenAI Whisper API
+      const formData = new FormData();
+      formData.append('file', audioFile);
+      formData.append('model', 'whisper-1');
+      // Optional: Give Whisper a prompt context to help it recognize domain words like "Pagdi", "Safa", or worker names
+      //formData.append('prompt', 'Sahi Taj ERP, Pagdi, Safa, Surendra Ji, Ramesh Ji, stock, raw material');
+	  //formData.append('prompt', 'Sahi Taj ERP, Safa, Ramesh ji ka order check karo, stock, raw material, written in Roman script / Hinglish');
+	
+
+      setNlQuery('Transcribing audio with Whisper...');
+
+      try {
+        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${OPENAI_API_KEY}`
+          },
+          body: formData
+        });
+
+        const data = await response.json();
+        if (data.text) {
+          setNlQuery(data.text);
+          handleNlQuerySubmit(data.text); // Automatically trigger your search/assistant logic
+        } else {
+          setNlQuery('');
+          alert('Transcription failed: ' + (data.error?.message || 'Unknown error'));
+        }
+      } catch (err) {
+        console.error('Whisper API Error:', err);
+        setNlQuery('');
+        alert('Network error while connecting to Whisper API.');
+      }
+
+      // Stop all microphone tracks
+      stream.getTracks().forEach(track => track.stop());
+    };
+
+    // Start recording
+    mediaRecorder.start();
+    setNlQuery('Listening... Speak now (Marwari/Hindi/English)');
+
+    // Automatically stop recording after 5 seconds (or add a stop button if preferred)
+    setTimeout(() => {
+      if (mediaRecorder.state === 'recording') {
+        mediaRecorder.stop();
+      }
+    }, 5000);
+
+  } catch (err) {
+    console.error('Microphone access denied or not supported:', err);
+    alert('Could not access microphone. Please check browser permissions.');
+  }
+};
+	  
+      // Data Source Mode Defaults to Cloud DB
+      const [dataSourceMode, setDataSourceMode] = useState('database');
       const [activeTab, setActiveTab] = useState('tasks');
       
+      // Authentication & RBAC State
+      const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('st_users')) || INITIAL_USERS);
+      const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('st_current_user')) || null);
+      const [loginForm, setLoginForm] = useState({ username: '', password: '' });
+      const [loginError, setLoginError] = useState('');
+
       // Separate View Switchers for Product & Worker Masters
       const [masterViewMode, setMasterViewMode] = useState('grid');
       const [workerViewMode, setWorkerViewMode] = useState('grid');
 
       // State Initializations with localStorage persistence for Mock Mode
       const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem('st_tasks')) || INITIAL_TASKS);
+      const [taskProgressBatches, setTaskProgressBatches] = useState(() => JSON.parse(localStorage.getItem('st_task_batches')) || INITIAL_PROGRESS_BATCHES);
       const [inventory, setInventory] = useState(() => JSON.parse(localStorage.getItem('st_inventory')) || INITIAL_INVENTORY);
       const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('st_products')) || INITIAL_PRODUCTS);
       const [workers, setWorkers] = useState(() => JSON.parse(localStorage.getItem('st_workers')) || INITIAL_WORKERS);
       const [workerSkills, setWorkerSkills] = useState(() => JSON.parse(localStorage.getItem('st_skills')) || INITIAL_WORKER_SKILLS);
       const [workerRates, setWorkerRates] = useState(() => JSON.parse(localStorage.getItem('st_rates')) || INITIAL_WORKER_RATES);
 
+      // Work Slip Lifecycle Modal State (For Workers / Admins to log work chunks)
+      const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
+      const [activeTaskToUpdate, setActiveTaskToUpdate] = useState(null);
+      const [progressUpdateForm, setProgressUpdateForm] = useState({ piecesChunk: '', newStatus: 'In Progress', paidIncrement: '', notes: '' });
+
+      // Admin Edit Slip Modal State
+      const [isEditSlipModalOpen, setIsEditSlipModalOpen] = useState(false);
+      const [activeTaskToEdit, setActiveTaskToEdit] = useState(null);
+      const [editSlipForm, setEditSlipForm] = useState({ slipNo: '', piecesReceived: '', ratePerPc: '', paidAmount: '', status: 'Pending', notes: '' });
+
+      // Speech Recognition & Audio Microphone State
+      const [isListening, setIsListening] = useState(false);
+      const recognitionRef = useRef(null);
+
       useEffect(() => {
         if (dataSourceMode === 'mock') {
           localStorage.setItem('st_tasks', JSON.stringify(tasks));
+          localStorage.setItem('st_task_batches', JSON.stringify(taskProgressBatches));
           localStorage.setItem('st_inventory', JSON.stringify(inventory));
           localStorage.setItem('st_products', JSON.stringify(products));
           localStorage.setItem('st_workers', JSON.stringify(workers));
           localStorage.setItem('st_skills', JSON.stringify(workerSkills));
           localStorage.setItem('st_rates', JSON.stringify(workerRates));
+          localStorage.setItem('st_users', JSON.stringify(users));
         }
-      }, [tasks, inventory, products, workers, workerSkills, workerRates, dataSourceMode]);
+        if (currentUser) {
+          localStorage.setItem('st_current_user', JSON.stringify(currentUser));
+        } else {
+          localStorage.removeItem('st_current_user');
+        }
+      }, [tasks, taskProgressBatches, inventory, products, workers, workerSkills, workerRates, users, currentUser, dataSourceMode]);
 
       // Natural Language Assistant & Test Drawer States
       const [nlQuery, setNlQuery] = useState('');
@@ -131,10 +280,22 @@
       const [showTestTools, setShowTestTools] = useState(false);
       const [showJsonInspector, setShowJsonInspector] = useState(false);
 
-      // Task Filters
+      // Task Filters (Scoped automatically if current user is a Worker)
       const [selectedWorker, setSelectedWorker] = useState('All');
       const [selectedStatus, setSelectedStatus] = useState('All');
       const [searchTerm, setSearchTerm] = useState('');
+
+      // If user is a worker, automatically lock selectedWorker to their worker name
+      useEffect(() => {
+        if (currentUser && currentUser.role === 'Worker') {
+          const wObj = workers.find(w => w.id === currentUser.worker_id);
+          if (wObj) {
+            setSelectedWorker(wObj.name);
+          }
+          // Workers should default to tasks tab
+          setActiveTab('tasks');
+        }
+      }, [currentUser, workers]);
 
       // Modal States
       const [isModalOpen, setIsModalOpen] = useState(false);
@@ -151,7 +312,7 @@
 
       // Worker Add/Edit & Custom Rates Modal State
       const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
-      const [workerForm, setWorkerForm] = useState({ id: '', name: '', role: 'Artisan', phone: '', skillLevel: 'Master Artisan', selectedProductIds: [], customRatesMap: {} });
+      const [workerForm, setWorkerForm] = useState({ id: '', name: '', role: 'Artisan', phone: '', skillLevel: 'Master Artisan', monthlyCapacity: 75, selectedProductIds: [], customRatesMap: {} });
 
       // Safe Delete Confirmation Warning Modal
       const [deleteWarning, setDeleteWarning] = useState({ isOpen: false, title: '', message: '', onConfirm: null });
@@ -160,31 +321,128 @@
 
       useEffect(() => { if (window.lucide) window.lucide.createIcons(); });
 
+      // Initialize Web Speech Recognition API
+      useEffect(() => {
+        const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+        if (SpeechRecognition) {
+          const recognition = new SpeechRecognition();
+          recognition.continuous = false;
+          recognition.interimResults = false;
+          recognition.lang = 'en-US';
+
+          recognition.onresult = (event) => {
+            const transcript = event.results[0][0].transcript;
+            setNlQuery(transcript);
+            setIsListening(false);
+            handleNlQuerySubmit(transcript);
+          };
+
+          recognition.onerror = (event) => {
+            console.error('Speech recognition error:', event.error);
+            setIsListening(false);
+          };
+
+          recognition.onend = () => {
+            setIsListening(false);
+          };
+
+          recognitionRef.current = recognition;
+        }
+      }, []);
+
+      const toggleAudioListening = () => {
+        if (!recognitionRef.current) {
+          alert('Voice input is not supported in this browser. Try Google Chrome or Safari.');
+          return;
+        }
+
+        if (isListening) {
+          recognitionRef.current.stop();
+          setIsListening(false);
+        } else {
+          setIsListening(true);
+          recognitionRef.current.start();
+        }
+      };
+
       // Fetch from Supabase
       useEffect(() => {
         if (dataSourceMode === 'database' && supabase) {
           async function fetchSupabaseData() {
             try {
-              const [{ data: t }, { data: i }, { data: p }, { data: w }, { data: s }, { data: r }] = await Promise.all([
+              const [{ data: t }, { data: b }, { data: i }, { data: p }, { data: w }, { data: s }, { data: r }, { data: u }] = await Promise.all([
                 supabase.from('tasks').select('*'),
+                supabase.from('task_progress_batches').select('*'),
                 supabase.from('inventory').select('*'),
                 supabase.from('products').select('*'),
                 supabase.from('workers').select('*'),
                 supabase.from('worker_skills').select('*'),
-                supabase.from('worker_product_rates').select('*')
+                supabase.from('worker_product_rates').select('*'),
+                supabase.from('users').select('*')
               ]);
 
               if (t) setTasks(t.map(item => ({ id: item.id, slipNo: item.slip_no, workerId: item.worker_id, workerName: item.worker_name, productId: item.product_id, date: item.date, description: item.description, piecesReceived: Number(item.pieces_received), ratePerPc: Number(item.rate_per_pc), totalAmount: Number(item.total_amount), paidAmount: Number(item.paid_amount), status: item.status, subSlipMaterials: item.sub_slip_materials || [], materialAllocated: item.material_allocated, notes: item.notes })));
+              if (b) setTaskProgressBatches(b.map(item => ({ id: item.id, task_id: item.task_id, pieces_completed: Number(item.pieces_completed), created_at: item.created_at, notes: item.notes })));
               if (i) setInventory(i.map(item => ({ id: item.id, name: item.name, unit: item.unit, stock: Number(item.stock), minAlert: Number(item.min_alert), category: item.category })));
               if (p) setProducts(p.map(item => ({ id: item.id, name: item.name, category: item.category, clothLength: item.cloth_length, clothType: item.cloth_type, color: item.color, defaultRate: Number(item.standard_rate), mrp: Number(item.mrp), description: item.description })));
-              if (w) setWorkers(w.map(item => ({ id: item.id, name: item.name, role: item.role, phone: item.phone, skillLevel: item.skill_level })));
+              if (w) setWorkers(w.map(item => ({ id: item.id, name: item.name, role: item.role, phone: item.phone, skillLevel: item.skill_level, monthlyCapacity: Number(item.monthly_capacity || 75) })));
               if (s) setWorkerSkills(s);
               if (r) setWorkerRates(r);
+              if (u && u.length > 0) setUsers(u);
             } catch (err) { console.error('Error fetching Supabase:', err); }
           }
           fetchSupabaseData();
         }
       }, [dataSourceMode]);
+
+      // LOGIN HANDLER
+      const handleLoginSubmit = async (e) => {
+        e.preventDefault();
+        setLoginError('');
+        const uname = loginForm.username.trim().toLowerCase();
+        const pwd = loginForm.password;
+        
+        const hashedInput = await hashPassword(pwd);
+        let foundUser = null;
+
+        if (dataSourceMode === 'database' && supabase) {
+          try {
+            const { data } = await supabase.from('users').select('*');
+            if (data && data.length > 0) {
+              const matchedRow = data.find(u => u.username.toLowerCase() === uname);
+              if (matchedRow) {
+                if (matchedRow.password_hash === hashedInput || matchedRow.password_hash === pwd) {
+                  foundUser = matchedRow;
+                }
+              }
+            }
+          } catch (err) {
+            console.error('Supabase login error:', err);
+          }
+        }
+
+        if (!foundUser && users && users.length > 0) {
+          foundUser = users.find(u => u.username.toLowerCase() === uname && (u.password_hash === hashedInput || u.password_hash === pwd));
+        }
+
+        if (foundUser) {
+          setCurrentUser({
+            id: foundUser.id,
+            username: foundUser.username,
+            role: foundUser.role,
+            worker_id: foundUser.worker_id
+          });
+          setLoginForm({ username: '', password: '' });
+          setLoginError('');
+        } else {
+          setLoginError('Invalid username or password.');
+        }
+      }; 
+
+      const handleLogout = () => {
+        setCurrentUser(null);
+        localStorage.removeItem('st_current_user');
+      };
 
       // PRODUCT CRUD HANDLERS
       const handleOpenAddProduct = () => {
@@ -234,7 +492,7 @@
 
       // WORKER & CUSTOM RATES CRUD HANDLERS
       const handleOpenAddWorker = () => {
-        setWorkerForm({ id: `WKR-0${workers.length + 1}`, name: '', role: 'Artisan Specialist', phone: '+91 98000 00000', skillLevel: 'Senior Specialist', selectedProductIds: [], customRatesMap: {} });
+        setWorkerForm({ id: `WKR-0${workers.length + 1}`, name: '', role: 'Artisan Specialist', phone: '+91 98000 00000', skillLevel: 'Senior Specialist', monthlyCapacity: 75, selectedProductIds: [], customRatesMap: {} });
         setIsWorkerModalOpen(true);
       };
 
@@ -242,7 +500,7 @@
         const mappedProdIds = workerSkills.filter(s => s.worker_id === wrk.id).map(s => s.product_id);
         const ratesMap = {};
         workerRates.filter(r => r.worker_id === wrk.id).forEach(r => { ratesMap[r.product_id] = r.custom_rate; });
-        setWorkerForm({ ...wrk, selectedProductIds: mappedProdIds, customRatesMap: ratesMap });
+        setWorkerForm({ ...wrk, monthlyCapacity: wrk.monthlyCapacity || 75, selectedProductIds: mappedProdIds, customRatesMap: ratesMap });
         setIsWorkerModalOpen(true);
       };
 
@@ -251,7 +509,7 @@
         const exists = workers.find(w => w.id === workerForm.id);
 
         if (dataSourceMode === 'database' && supabase) {
-          const payload = { id: workerForm.id, name: workerForm.name, role: workerForm.role, phone: workerForm.phone, skill_level: workerForm.skillLevel };
+          const payload = { id: workerForm.id, name: workerForm.name, role: workerForm.role, phone: workerForm.phone, skill_level: workerForm.skillLevel, monthly_capacity: Number(workerForm.monthlyCapacity || 75) };
           if (exists) await supabase.from('workers').update(payload).eq('id', workerForm.id);
           else await supabase.from('workers').insert([payload]);
 
@@ -267,21 +525,20 @@
           if (rateInserts.length > 0) await supabase.from('worker_product_rates').insert(rateInserts);
         }
 
-        const newWrk = { id: workerForm.id, name: workerForm.name, role: workerForm.role, phone: workerForm.phone, skillLevel: workerForm.skillLevel };
+        const newWrk = { id: workerForm.id, name: workerForm.name, role: workerForm.role, phone: workerForm.phone, skillLevel: workerForm.skillLevel, monthlyCapacity: Number(workerForm.monthlyCapacity || 75) };
         if (exists) setWorkers(workers.map(w => w.id === workerForm.id ? newWrk : w));
         else setWorkers([...workers, newWrk]);
 
-        // Reactive local update of skills & custom rates
         const newSkills = workerSkills.filter(s => s.worker_id !== workerForm.id).concat(workerForm.selectedProductIds.map(pid => ({ worker_id: workerForm.id, product_id: pid })));
         setWorkerSkills(newSkills);
 
-    const updatedRates = workerRates.filter(r => String(r.worker_id).trim() !== String(workerForm.id).trim());
-Object.entries(workerForm.customRatesMap).forEach(([pid, r]) => {
-  if (workerForm.selectedProductIds.includes(pid) && Number(r) > 0) {
-    updatedRates.push({ worker_id: String(workerForm.id).trim(), product_id: pid, custom_rate: Number(r) });
-  }
-});
-setWorkerRates([...updatedRates]); // Spread array to force React state re-render
+        const updatedRates = workerRates.filter(r => String(r.worker_id).trim() !== String(workerForm.id).trim());
+        Object.entries(workerForm.customRatesMap).forEach(([pid, r]) => {
+          if (workerForm.selectedProductIds.includes(pid) && Number(r) > 0) {
+            updatedRates.push({ worker_id: String(workerForm.id).trim(), product_id: pid, custom_rate: Number(r) });
+          }
+        });
+        setWorkerRates([...updatedRates]);
 
         setIsWorkerModalOpen(false);
       };
@@ -297,7 +554,7 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
               await supabase.from('workers').delete().eq('id', wrkId);
             }
             setWorkers(workers.filter(w => w.id !== wrkId));
-            setWorkerSkills(workerSkills.filter(s => s.worker_id !== wrkId));
+            setWorkerSkills(workerSkills.filter(s => s.product_id !== wrkId));
             setWorkerRates(workerRates.filter(r => r.worker_id !== wrkId));
             setDeleteWarning({ isOpen: false, title: '', message: '', onConfirm: null });
           }
@@ -330,39 +587,95 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
         setNewTask({ ...newTask, workerId: wrkId, ratePerPc: resolvedRate });
       };
 
+      // COMPUTE DYNAMIC TASK COMPLETED PIECES FROM BATCHES (IMMUTABLE BASELINE MODEL)
+      const getTaskCompletedPieces = (taskId) => {
+        return taskProgressBatches
+          .filter(b => String(b.task_id) === String(taskId))
+          .reduce((sum, b) => sum + Number(b.pieces_completed || 0), 0);
+      };
+
       // KPI Summaries
       const metrics = useMemo(() => {
-        let totalPieces = 0, totalPayable = 0, totalPaid = 0;
-        tasks.forEach(t => { totalPieces += Number(t.piecesReceived || 0); totalPayable += Number(t.totalAmount || 0); totalPaid += Number(t.paidAmount || 0); });
-        return { totalPieces, totalPayable, totalPaid, balanceOutstanding: totalPayable - totalPaid, lowStockCount: inventory.filter(i => i.stock <= i.minAlert).length };
-      }, [tasks, inventory]);
+        let totalPiecesTarget = 0, totalPiecesCompleted = 0, totalPayable = 0, totalPaid = 0;
+        tasks.forEach(t => { 
+          totalPiecesTarget += Number(t.piecesReceived || 0); 
+          totalPiecesCompleted += getTaskCompletedPieces(t.id);
+          totalPayable += Number(t.totalAmount || 0); 
+          totalPaid += Number(t.paidAmount || 0); 
+        });
+        return { 
+          totalPiecesTarget, 
+          totalPiecesCompleted, 
+          totalPayable, 
+          totalPaid, 
+          balanceOutstanding: totalPayable - totalPaid, 
+          lowStockCount: inventory.filter(i => i.stock <= i.minAlert).length 
+        };
+      }, [tasks, taskProgressBatches, inventory]);
 
       const filteredTasks = useMemo(() => {
         return tasks.filter(t => {
-          const matchesWorker = selectedWorker === 'All' || t.workerName === selectedWorker;
+          const matchesWorker = (currentUser && currentUser.role === 'Worker') 
+            ? (t.workerName === workers.find(w => w.id === currentUser.worker_id)?.name)
+            : (selectedWorker === 'All' || t.workerName === selectedWorker);
+
           const matchesStatus = selectedStatus === 'All' || t.status === selectedStatus;
           const matchesSearch = t.slipNo.toLowerCase().includes(searchTerm.toLowerCase()) || t.description.toLowerCase().includes(searchTerm.toLowerCase()) || t.workerName.toLowerCase().includes(searchTerm.toLowerCase());
           return matchesWorker && matchesStatus && matchesSearch;
         });
-      }, [tasks, selectedWorker, selectedStatus, searchTerm]);
+      }, [tasks, selectedWorker, selectedStatus, searchTerm, currentUser, workers]);
 
       const workerSummary = useMemo(() => {
         const summaryMap = {};
-        workers.forEach(w => { summaryMap[w.name] = { name: w.name, role: w.role || w.skillLevel, totalTasks: 0, totalPieces: 0, totalEarned: 0, totalPaid: 0, balance: 0, materialConsumed: 0 }; });
+        workers.forEach(w => { 
+          summaryMap[w.name] = { 
+            id: w.id,
+            name: w.name, 
+            role: w.role || w.skillLevel, 
+            monthlyCapacity: w.monthlyCapacity || 75,
+            totalTasks: 0, 
+            totalTargetPieces: 0,
+            totalCompletedPieces: 0, 
+            totalEarned: 0, 
+            totalPaid: 0, 
+            balance: 0, 
+            materialConsumed: 0 
+          }; 
+        });
         tasks.forEach(t => {
-          if (!summaryMap[t.workerName]) summaryMap[t.workerName] = { name: t.workerName, role: 'Artisan', totalTasks: 0, totalPieces: 0, totalEarned: 0, totalPaid: 0, balance: 0, materialConsumed: 0 };
+          if (!summaryMap[t.workerName]) summaryMap[t.workerName] = { id: t.workerId, name: t.workerName, role: 'Artisan', monthlyCapacity: 75, totalTasks: 0, totalTargetPieces: 0, totalCompletedPieces: 0, totalEarned: 0, totalPaid: 0, balance: 0, materialConsumed: 0 };
           const w = summaryMap[t.workerName];
           w.totalTasks += 1;
-          w.totalPieces += Number(t.piecesReceived || 0);
+          w.totalTargetPieces += Number(t.piecesReceived || 0);
+          w.totalCompletedPieces += getTaskCompletedPieces(t.id);
           w.totalEarned += Number(t.totalAmount || 0);
           w.totalPaid += Number(t.paidAmount || 0);
           w.balance = w.totalEarned - w.totalPaid;
           if (t.subSlipMaterials) t.subSlipMaterials.forEach(m => { w.materialConsumed += Number(m.qty || 0); });
         });
         return Object.values(summaryMap);
-      }, [workers, tasks]);
+      }, [workers, tasks, taskProgressBatches]);
 
-      // Natural Language AI Queries Handler
+      // Work-In-Progress (WIP) Analytics per Product Master Item
+      const wipProductSummary = useMemo(() => {
+        const wipMap = {};
+        products.forEach(p => { wipMap[p.id] = { id: p.id, name: p.name, category: p.category, defaultRate: p.defaultRate, activeSlips: 0, totalTargetPieces: 0, totalCompletedPieces: 0, grossValue: 0 }; });
+        tasks.forEach(t => {
+          if (t.productId && wipMap[t.productId]) {
+            wipMap[t.productId].activeSlips += 1;
+            wipMap[t.productId].totalTargetPieces += Number(t.piecesReceived || 0);
+            wipMap[t.productId].totalCompletedPieces += getTaskCompletedPieces(t.id);
+            wipMap[t.productId].grossValue += Number(t.totalAmount || 0);
+          }
+        });
+        return Object.values(wipMap);
+      }, [products, tasks, taskProgressBatches]);
+
+
+
+
+
+      // EXPANDED NATURAL LANGUAGE AI ASSISTANT & TOOLS
       const handleNlQuerySubmit = (queryText) => {
         const q = (queryText || nlQuery).toLowerCase().trim();
         if (!q) return;
@@ -370,17 +683,49 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
         setActiveTab('tasks');
         let matchedResult = { text: '', type: 'info' };
 
+        // 1. Tool: Check Worker Progress Tool
+        if (q.includes('check progress') || q.includes('worker progress') || q.includes('progress from')) {
+          const matchedWorker = workers.find(w => q.includes(w.name.toLowerCase().split(' ')[0]));
+          if (matchedWorker) {
+            const summary = workerSummary.find(ws => ws.id === matchedWorker.id);
+            if (summary) {
+              matchedResult = {
+                text: `Tool Result [check_worker_progress]: ${summary.name} has completed ${summary.totalCompletedPieces}/${summary.totalTargetPieces} pieces across ${summary.totalTasks} tasks. Pending payout balance: ₹${summary.balance}.`,
+                type: 'success'
+              };
+              if (currentUser?.role === 'Admin') setSelectedWorker(summary.name);
+              return setNlResponse(matchedResult);
+            }
+          }
+        }
+
+        // 2. Tool: Check Stock Tool
+        if (q.includes('check stock') || q.includes('stock level') || q.includes('inventory of')) {
+          const matchedItem = inventory.find(i => q.includes(i.name.toLowerCase().split(' ')[0]) || q.includes(i.id.toLowerCase()));
+          if (matchedItem) {
+            matchedResult = {
+              text: `Tool Result [check_stock]: "${matchedItem.name}" stock is ${matchedItem.stock} ${matchedItem.unit} (Min Alert: ${matchedItem.minAlert} ${matchedItem.unit}). Status: ${matchedItem.stock <= matchedItem.minAlert ? '⚠️ LOW STOCK ALERT' : '✅ Healthy'}.`,
+              type: matchedItem.stock <= matchedItem.minAlert ? 'warning' : 'success'
+            };
+            if (currentUser?.role === 'Admin') setActiveTab('inventory');
+            return setNlResponse(matchedResult);
+          }
+        }
+
+        // Standard Filter Interpretations
         if (q.includes('pending') || q.includes('unpaid')) {
-          setSelectedStatus('Pending'); setSelectedWorker('All');
+          setSelectedStatus('Pending'); if (currentUser?.role === 'Admin') setSelectedWorker('All');
           matchedResult = { text: 'Filtered task ledger to show all Pending / Unpaid work orders.', type: 'success' };
         } else if (q.includes('surendra')) {
-          setSelectedWorker('Surendra Ji'); setSelectedStatus('All');
+          if (currentUser?.role === 'Admin') setSelectedWorker('Surendra Ji'); 
+          setSelectedStatus('All');
           matchedResult = { text: 'Filtered task ledger for artisan Surendra Ji.', type: 'success' };
         } else if (q.includes('ramesh')) {
-          setSelectedWorker('Ramesh Ji'); setSelectedStatus('All');
+          if (currentUser?.role === 'Admin') setSelectedWorker('Ramesh Ji'); 
+          setSelectedStatus('All');
           matchedResult = { text: 'Filtered task ledger for artisan Ramesh Ji.', type: 'success' };
         } else if (q.includes('low stock') || q.includes('alert')) {
-          setActiveTab('inventory');
+          if (currentUser?.role === 'Admin') setActiveTab('inventory');
           matchedResult = { text: 'Navigated to Raw Material Inventory. Showing active stock alert items.', type: 'warning' };
         } else {
           setSearchTerm(q);
@@ -388,6 +733,9 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
         }
         setNlResponse(matchedResult);
       };
+
+
+
 
       // Simulation Test Tools Handlers
       const handleSimulateRandomOrder = () => {
@@ -414,23 +762,27 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
           if (item.id === 'RM-07') return { ...item, stock: 10 };
           return item;
         }));
-        setActiveTab('inventory');
+        if (currentUser?.role === 'Admin') setActiveTab('inventory');
         setNlResponse({ text: 'Test tool forced Gold Brocade Tissue Fabric stock down to 10 Meters (Triggered Low Stock Alert).', type: 'warning' });
       };
 
       const handleResetLocalState = () => {
         localStorage.removeItem('st_tasks');
+        localStorage.removeItem('st_task_batches');
         localStorage.removeItem('st_inventory');
         localStorage.removeItem('st_products');
         localStorage.removeItem('st_workers');
         localStorage.removeItem('st_skills');
         localStorage.removeItem('st_rates');
+        localStorage.removeItem('st_users');
         setTasks(INITIAL_TASKS);
+        setTaskProgressBatches(INITIAL_PROGRESS_BATCHES);
         setInventory(INITIAL_INVENTORY);
         setProducts(INITIAL_PRODUCTS);
         setWorkers(INITIAL_WORKERS);
         setWorkerSkills(INITIAL_WORKER_SKILLS);
         setWorkerRates(INITIAL_WORKER_RATES);
+        setUsers(INITIAL_USERS);
         setNlResponse({ text: 'Reset application memory back to factory default mock state.', type: 'info' });
       };
 
@@ -455,12 +807,25 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
         const pieces = Number(newTask.piecesReceived), rate = Number(newTask.ratePerPc), total = pieces * rate, paid = Number(newTask.paidAmount || 0);
         const prodObj = products.find(p => p.id === newTask.productId), wrkObj = workers.find(w => w.id === newTask.workerId);
 
+        let updatedInventoryList = [...inventory];
         if (materialSubSlip.length > 0) {
-          setInventory(inventory.map(item => {
+          updatedInventoryList = inventory.map(item => {
             const matches = materialSubSlip.filter(m => m.id === item.id);
             if (matches.length > 0) return { ...item, stock: Math.max(0, item.stock - matches.reduce((a, c) => a + c.qty, 0)) };
             return item;
-          }));
+          });
+          setInventory(updatedInventoryList);
+
+          if (dataSourceMode === 'database' && supabase) {
+            for (const sub of materialSubSlip) {
+              const currentItem = inventory.find(i => i.id === sub.id);
+              const updatedStock = Math.max(0, (currentItem ? currentItem.stock : 0) - sub.qty);
+              await supabase
+                .from('inventory')
+                .update({ stock: updatedStock })
+                .eq('id', sub.id);
+            }
+          }
         }
 
         const createdTask = {
@@ -479,122 +844,375 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
         setMaterialSubSlip([]);
       };
 
-      const handleRestockSubmit = (e) => {
+      // Restock Handler
+      const handleRestockSubmit = async (e) => {
         e.preventDefault();
         if (!restockData.addQty || Number(restockData.addQty) <= 0) return;
         const qtyToAdd = Number(restockData.addQty);
-        setInventory(inventory.map(item => item.id === restockData.materialId ? { ...item, stock: item.stock + qtyToAdd } : item));
+        const targetItem = inventory.find(i => i.id === restockData.materialId);
+        const newStock = (targetItem ? targetItem.stock : 0) + qtyToAdd;
+
+        if (dataSourceMode === 'database' && supabase) {
+          const { error } = await supabase
+            .from('inventory')
+            .update({ stock: newStock })
+            .eq('id', restockData.materialId);
+          if (error) {
+            alert('Supabase Error updating stock: ' + error.message);
+            return;
+          }
+        }
+
+        setInventory(inventory.map(item => item.id === restockData.materialId ? { ...item, stock: newStock } : item));
         setIsRestockModalOpen(false);
         setRestockData({ materialId: 'RM-01', addQty: '' });
       };
 
-      return (
-        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col antialiased">
-          {/* HEADER */}
-          <header className="bg-gradient-to-r from-amber-900 via-amber-800 to-amber-950 text-white shadow-lg sticky top-0 z-40">
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-              <div className="flex items-center justify-between h-20">
-                <div className="flex items-center space-x-3">
-                  <div className="bg-amber-500/20 p-2.5 rounded-xl border border-amber-400/30 backdrop-blur-sm">
-                    <i data-lucide="crown" className="w-7 h-7 text-amber-300"></i>
+      // WORK SLIP LIFECYCLE: Open Progress Update Modal (Logs Work Chunks without altering baseline order size)
+      const handleOpenProgressModal = (task) => {
+        setActiveTaskToUpdate(task);
+        setProgressUpdateForm({ piecesChunk: '', newStatus: task.status === 'Pending' ? 'In Progress' : task.status, paidIncrement: '', notes: '' });
+        setIsProgressModalOpen(true);
+      };
+
+      // WORK SLIP LIFECYCLE: Submit Work Chunk Progress Batch
+      const handleProgressSubmit = async (e) => {
+        e.preventDefault();
+        if (!activeTaskToUpdate) return;
+
+        const newChunkPieces = Number(progressUpdateForm.piecesChunk || 0);
+        const incPaid = Number(progressUpdateForm.paidIncrement || 0);
+        const newTotalPaid = Number(activeTaskToUpdate.paidAmount || 0) + incPaid;
+        const finalStatus = progressUpdateForm.newStatus;
+
+        // Create discrete chunk entry in task_progress_batches
+        const newBatchObj = {
+          id: Date.now(),
+          task_id: activeTaskToUpdate.id,
+          pieces_completed: newChunkPieces,
+          created_at: new Date().toISOString(),
+          notes: progressUpdateForm.notes || 'Worker progress chunk'
+        };
+
+        if (dataSourceMode === 'database' && supabase) {
+          if (newChunkPieces > 0) {
+            await supabase.from('task_progress_batches').insert([{
+              task_id: activeTaskToUpdate.id,
+              pieces_completed: newChunkPieces,
+              notes: progressUpdateForm.notes || 'Worker progress chunk'
+            }]);
+          }
+
+          await supabase.from('tasks').update({
+            paid_amount: newTotalPaid,
+            status: finalStatus,
+            notes: progressUpdateForm.notes ? `${activeTaskToUpdate.notes || ''} | ${progressUpdateForm.notes}` : activeTaskToUpdate.notes
+          }).eq('id', activeTaskToUpdate.id);
+        }
+
+        if (newChunkPieces > 0) {
+          setTaskProgressBatches([...taskProgressBatches, newBatchObj]);
+        }
+
+        const updatedTask = {
+          ...activeTaskToUpdate,
+          paidAmount: newTotalPaid,
+          status: finalStatus,
+          notes: progressUpdateForm.notes ? `${activeTaskToUpdate.notes || ''} | ${progressUpdateForm.notes}` : activeTaskToUpdate.notes
+        };
+
+        setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+        setIsProgressModalOpen(false);
+        setActiveTaskToUpdate(null);
+      };
+
+      // ADMIN EDIT SLIP: Open Edit Modal
+      const handleOpenEditSlipModal = (task) => {
+        setActiveTaskToEdit(task);
+        setEditSlipForm({
+          slipNo: task.slipNo,
+          piecesReceived: task.piecesReceived,
+          ratePerPc: task.ratePerPc,
+          paidAmount: task.paidAmount,
+          status: task.status,
+          notes: task.notes || ''
+        });
+        setIsEditSlipModalOpen(true);
+      };
+
+      // ADMIN EDIT SLIP: Submit Edit
+      const handleEditSlipSubmit = async (e) => {
+        e.preventDefault();
+        if (!activeTaskToEdit) return;
+
+        const newPieces = Number(editSlipForm.piecesReceived);
+        const newRate = Number(editSlipForm.ratePerPc);
+        const newTotal = newPieces * newRate;
+        const newPaid = Number(editSlipForm.paidAmount);
+        const newStatus = editSlipForm.status;
+
+        const updatedTask = {
+          ...activeTaskToEdit,
+          slipNo: editSlipForm.slipNo.toUpperCase(),
+          piecesReceived: newPieces,
+          ratePerPc: newRate,
+          totalAmount: newTotal,
+          paidAmount: newPaid,
+          status: newStatus,
+          notes: editSlipForm.notes
+        };
+
+        if (dataSourceMode === 'database' && supabase) {
+          await supabase.from('tasks').update({
+            slip_no: updatedTask.slipNo,
+            pieces_received: newPieces,
+            rate_per_pc: newRate,
+            total_amount: newTotal,
+            paid_amount: newPaid,
+            status: newStatus,
+            notes: editSlipForm.notes
+          }).eq('id', updatedTask.id);
+        }
+
+        setTasks(tasks.map(t => t.id === updatedTask.id ? updatedTask : t));
+        setIsEditSlipModalOpen(false);
+        setActiveTaskToEdit(null);
+      };
+
+      // RENDER LOGIN SCREEN IF NOT AUTHENTICATED
+      if (!currentUser) {
+        return (
+          <div className="min-h-screen bg-gradient-to-br from-amber-950 via-amber-900 to-slate-900 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl max-w-md w-full p-8 shadow-2xl border border-amber-500/30 text-slate-800">
+              <div className="text-center mb-6">
+                <div className="w-16 h-16 bg-amber-500/20 rounded-2xl border border-amber-400/40 flex items-center justify-center mx-auto mb-3 shadow-inner">
+                  <i data-lucide="crown" className="w-8 h-8 text-amber-600"></i>
+                </div>
+                <h1 className="text-2xl font-black tracking-tight bg-gradient-to-r from-amber-800 to-amber-950 bg-clip-text text-transparent">
+                  Sahi Taj Portal
+                </h1>
+                <p className="text-xs text-slate-500 mt-1">ERP & Master Management System</p>
+              </div>
+
+              <form onSubmit={handleLoginSubmit} className="space-y-4">
+                {loginError && (
+                  <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
+                    {loginError}
                   </div>
-                  <div>
-                    <h1 className="text-xl sm:text-2xl font-bold tracking-tight bg-gradient-to-r from-amber-100 via-amber-200 to-amber-400 bg-clip-text text-transparent">
-                      Shahi Taj ERP
-                    </h1>
-                    <p className="text-xs text-amber-200/80 font-medium">
-                      Pagadi Master & Relational Operations Portal
-                    </p>
-                  </div>
+                )}
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Username</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. admin or surendra"
+                    value={loginForm.username}
+                    onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border text-sm focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-bold text-slate-700 mb-1">Password</label>
+                  <input
+                    type="password"
+                    required
+                    placeholder="••••••••"
+                    value={loginForm.password}
+                    onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
+                    className="w-full px-4 py-3 bg-slate-50 rounded-xl border text-sm focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
+                  />
+                  <span className="text-[10px] text-slate-400 mt-1 block">Default password for all accounts: SahiTaj2026!</span>
                 </div>
 
-                {/* Data Source Mode Toggle Switch */}
-                <div className="hidden lg:flex items-center bg-amber-950/70 p-1 rounded-xl border border-amber-600/60 shadow-inner">
-                  <button
-                    onClick={() => setDataSourceMode('mock')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition ${
-                      dataSourceMode === 'mock' ? 'bg-amber-500 text-amber-950 shadow' : 'text-amber-200 hover:text-white'
-                    }`}
-                  >
-                    📦 LocalStorage (Mock)
-                  </button>
-                  <button
-                    onClick={() => setDataSourceMode('database')}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1 ${
-                      dataSourceMode === 'database' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-amber-200 hover:text-white'
-                    }`}
-                  >
-                    <span>☁️ Supabase DB</span>
-                  </button>
+                <button
+                  type="submit"
+                  className="w-full mt-2 bg-gradient-to-r from-amber-600 to-amber-700 hover:from-amber-700 hover:to-amber-800 text-white font-bold py-3 px-4 rounded-xl shadow-lg transition active:scale-95 text-sm"
+                >
+                  Sign In to Sahi Taj
+                </button>
+              </form>
+
+              <div className="mt-6 pt-4 border-t text-center">
+                <span className="text-xs text-slate-400 block font-medium">Quick Demo Credentials:</span>
+                <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                  <button onClick={() => setLoginForm({ username: 'admin', password: 'SahiTaj2026!' })} className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded font-semibold">Admin</button>
+                  <button onClick={() => setLoginForm({ username: 'surendra', password: 'SahiTaj2026!' })} className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Surendra (WKR-01)</button>
+                  <button onClick={() => setLoginForm({ username: 'ramesh', password: 'SahiTaj2026!' })} className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Ramesh (WKR-02)</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+      }
+
+      return (
+        <div className="min-h-screen bg-slate-50 text-slate-800 font-sans flex flex-col antialiased">
+          {/* HEADER WITH USER ROLE BADGE & LOGOUT */}
+          <header className="bg-gradient-to-r from-amber-900 via-amber-800 to-amber-950 text-white shadow-lg sticky top-0 z-40">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+              <div className="flex items-center justify-between h-16 sm:h-20">
+                <div className="flex items-center space-x-3">
+                  <div className="bg-amber-500/20 p-2 rounded-xl border border-amber-400/30 backdrop-blur-sm">
+                    <i data-lucide="crown" className="w-6 h-6 text-amber-300"></i>
+                  </div>
+                  <div>
+                    <h1 className="text-xl sm:text-2xl font-black tracking-tight bg-gradient-to-r from-amber-100 via-amber-200 to-amber-400 bg-clip-text text-transparent">
+                      Sahi Taj
+                    </h1>
+                    <div className="text-[11px] text-amber-200/80 font-medium">
+                      Logged in as: <strong className="text-white capitalize">{currentUser.username}</strong> 
+                      <span className={`ml-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold ${currentUser.role === 'Admin' ? 'bg-amber-500 text-amber-950' : 'bg-emerald-500 text-slate-950'}`}>
+                        {currentUser.role} {currentUser.worker_id ? `(${currentUser.worker_id})` : ''}
+                      </span>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Desktop Navigation */}
                 <nav className="hidden md:flex space-x-1 bg-amber-950/40 p-1.5 rounded-xl border border-amber-700/40">
                   <button onClick={() => setActiveTab('tasks')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'tasks' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>Task Ledger</button>
-                  <button onClick={() => setActiveTab('inventory')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'inventory' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>
-                    Raw Materials {metrics.lowStockCount > 0 && <span className="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px]">{metrics.lowStockCount}</span>}
-                  </button>
-                  <button onClick={() => setActiveTab('catalog')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'catalog' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>Product & Worker Masters</button>
-                  <button onClick={() => setActiveTab('summary')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'summary' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>Analytics</button>
+                  {currentUser.role === 'Admin' && (
+                    <>
+                      <button onClick={() => setActiveTab('inventory')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'inventory' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>
+                        Raw Materials {metrics.lowStockCount > 0 && <span className="ml-1 px-1.5 py-0.2 bg-rose-500 text-white rounded-full text-[10px]">{metrics.lowStockCount}</span>}
+                      </button>
+                      <button onClick={() => setActiveTab('catalog')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'catalog' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>Product & Worker Masters</button>
+                      <button onClick={() => setActiveTab('summary')} className={`px-3.5 py-2 rounded-lg text-sm font-semibold transition ${activeTab === 'summary' ? 'bg-amber-500 text-amber-950 shadow-md' : 'text-amber-100 hover:bg-amber-800/60'}`}>Analytics</button>
+                    </>
+                  )}
                 </nav>
 
-                <div className="flex items-center space-x-3">
-                  <button onClick={() => setShowTestTools(!showTestTools)} className="hidden lg:flex items-center space-x-1.5 bg-amber-800/60 hover:bg-amber-800 text-amber-100 font-medium px-3.5 py-2.5 rounded-xl border border-amber-600/40 text-sm transition">
-                    <i data-lucide="wrench" className="w-4 h-4 text-amber-300"></i>
-                    <span>Test Tools</span>
+                <div className="flex items-center space-x-2 sm:space-x-3">
+                  {currentUser.role === 'Admin' && (
+                    <>
+                      <button onClick={() => setShowTestTools(!showTestTools)} className="hidden lg:flex items-center space-x-1.5 bg-amber-800/60 hover:bg-amber-800 text-amber-100 font-medium px-3.5 py-2.5 rounded-xl border border-amber-600/40 text-sm transition">
+                        <i data-lucide="wrench" className="w-4 h-4 text-amber-300"></i>
+                        <span>Test Tools</span>
+                      </button>
+                      <button onClick={() => setIsModalOpen(true)} className="hidden md:flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-md transition transform active:scale-95 text-sm">
+                        <i data-lucide="plus" className="w-4 h-4"></i>
+                        <span>Add Slip & Material</span>
+                      </button>
+                    </>
+                  )}
+
+                  <button onClick={handleLogout} className="bg-rose-900/80 hover:bg-rose-900 text-rose-100 px-3 py-2 rounded-xl text-xs font-bold border border-rose-700/50 transition">
+                    Logout
                   </button>
-                  <button onClick={() => setIsModalOpen(true)} className="flex items-center space-x-2 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-medium px-4 py-2.5 rounded-xl shadow-md transition transform active:scale-95 text-sm">
-                    <i data-lucide="plus" className="w-4 h-4"></i>
-                    <span className="hidden sm:inline">Add Slip & Material</span>
+
+                  <button 
+                    onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+                    className="md:hidden p-2 rounded-xl bg-amber-800/60 text-amber-100 border border-amber-600/40 hover:bg-amber-800 focus:outline-none"
+                    aria-label="Toggle Mobile Menu"
+                  >
+                    <i data-lucide={mobileMenuOpen ? "x" : "menu"} className="w-6 h-6"></i>
                   </button>
                 </div>
               </div>
             </div>
-          </header>
 
-          {/* MAIN CONTAINER */}
-          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
-
-            {dataSourceMode === 'database' && (
-              <div className="bg-emerald-950/40 border border-emerald-600/50 p-3.5 rounded-xl text-emerald-200 text-xs flex items-center justify-between">
-                <span className="flex items-center"><span className="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse mr-2"></span>Connected to Live PostgreSQL via Supabase. Ready.</span>
-                <span className="font-mono text-[11px] text-emerald-400">Mode: Cloud DB</span>
+            {/* Mobile Navigation Dropdown Drawer */}
+            {mobileMenuOpen && (
+              <div className="md:hidden bg-amber-950 border-t border-amber-800/80 px-4 pt-3 pb-5 space-y-3 shadow-2xl">
+                <div className="flex flex-col space-y-1">
+                  <button onClick={() => { setActiveTab('tasks'); setMobileMenuOpen(false); }} className={`px-4 py-2.5 rounded-xl text-left text-sm font-semibold transition ${activeTab === 'tasks' ? 'bg-amber-500 text-amber-950 shadow' : 'text-amber-100 hover:bg-amber-900/50'}`}>Task Ledger</button>
+                  {currentUser.role === 'Admin' && (
+                    <>
+                      <button onClick={() => { setActiveTab('inventory'); setMobileMenuOpen(false); }} className={`px-4 py-2.5 rounded-xl text-left text-sm font-semibold flex items-center justify-between transition ${activeTab === 'inventory' ? 'bg-amber-500 text-amber-950 shadow' : 'text-amber-100 hover:bg-amber-900/50'}`}>
+                        <span>Raw Materials</span>
+                        {metrics.lowStockCount > 0 && <span className="px-2 py-0.5 bg-rose-500 text-white rounded-full text-xs font-bold">{metrics.lowStockCount} low</span>}
+                      </button>
+                      <button onClick={() => { setActiveTab('catalog'); setMobileMenuOpen(false); }} className={`px-4 py-2.5 rounded-xl text-left text-sm font-semibold transition ${activeTab === 'catalog' ? 'bg-amber-500 text-amber-950 shadow' : 'text-amber-100 hover:bg-amber-900/50'}`}>Product & Worker Masters</button>
+                      <button onClick={() => { setActiveTab('summary'); setMobileMenuOpen(false); }} className={`px-4 py-2.5 rounded-xl text-left text-sm font-semibold transition ${activeTab === 'summary' ? 'bg-amber-500 text-amber-950 shadow' : 'text-amber-100 hover:bg-amber-900/50'}`}>Analytics & Workload</button>
+                      <button onClick={() => { setShowTestTools(!showTestTools); setMobileMenuOpen(false); }} className="px-4 py-2.5 rounded-xl text-left text-sm font-semibold text-amber-300 hover:bg-amber-900/50 flex items-center space-x-2">
+                        <i data-lucide="wrench" className="w-4 h-4"></i>
+                        <span>Developer Test Tools</span>
+                      </button>
+                    </>
+                  )}
+                </div>
               </div>
             )}
+          </header>
 
-            {/* NATURAL LANGUAGE AI PROMPT BAR */}
+          {/* STICKY MOBILE QUICK-ACTION BAR (ADMIN ONLY) */}
+          {currentUser.role === 'Admin' && (
+            <div className="md:hidden sticky top-16 z-30 bg-amber-900/95 backdrop-blur-md border-b border-amber-700/60 px-4 py-2 shadow-md">
+              <div className="max-w-7xl mx-auto flex items-center justify-between gap-2">
+                <button 
+                  onClick={() => setIsModalOpen(true)} 
+                  className="flex-1 flex items-center justify-center space-x-1.5 bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white font-bold py-2 px-3 rounded-xl shadow text-xs active:scale-95 transition"
+                >
+                  <i data-lucide="plus" className="w-4 h-4"></i>
+                  <span>+ Issue Work Order Slip</span>
+                </button>
+                <button 
+                  onClick={() => setIsRestockModalOpen(true)} 
+                  className="flex items-center justify-center space-x-1 bg-amber-800 hover:bg-amber-700 text-amber-100 font-semibold py-2 px-3 rounded-xl border border-amber-600/50 text-xs active:scale-95 transition"
+                >
+                  <i data-lucide="refresh-cw" className="w-3.5 h-3.5 text-amber-300"></i>
+                  <span>Restock</span>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* MAIN CONTAINER */}
+          <main className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+            {/* NATURAL LANGUAGE AI PROMPT BAR WITH AUDIO MIC LINK & TOOLS */}
             <div className="bg-gradient-to-r from-amber-900/90 via-amber-800 to-slate-900 rounded-2xl p-5 shadow-lg border border-amber-700/50 text-white">
-              <div className="flex items-center space-x-2 mb-2">
-                <div className="bg-amber-500/20 p-1.5 rounded-lg text-amber-300"><i data-lucide="sparkles" className="w-4 h-4"></i></div>
-                <h3 className="text-sm font-bold text-amber-100 uppercase tracking-wider">Shahi Taj Natural Language Assistant</h3>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center space-x-2">
+                  <div className="bg-amber-500/20 p-1.5 rounded-lg text-amber-300"><i data-lucide="sparkles" className="w-4 h-4"></i></div>
+                  <h3 className="text-sm font-bold text-amber-100 uppercase tracking-wider">Sahi Taj Natural Language Assistant & Tools</h3>
+                </div>
+                {OPENAI_API_KEY && (
+                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                    OpenAI Key Loaded
+                  </span>
+                )}
               </div>
               <p className="text-xs text-amber-200/80 mb-3">
-                Type what you want to find in plain English (e.g. <span className="underline italic">"Show pending orders"</span>, <span className="underline italic">"Surendra Ji tasks"</span>, <span className="underline italic">"Low stock items"</span>)
+                Type or speak using the mic (e.g. <span className="underline italic">"Check progress from Surendra"</span>, <span className="underline italic">"Check stock Cotton Base"</span>)
               </p>
               <form onSubmit={(e) => { e.preventDefault(); handleNlQuerySubmit(); }} className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <i data-lucide="search" className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
                   <input
                     type="text"
-                    placeholder="Ask AI: e.g., 'Show pending orders', 'Surendra Ji tasks', 'Low stock'..."
+                    placeholder="Ask or speak: e.g., 'Check progress Surendra', 'Check stock Silk', 'Show pending'..."
                     value={nlQuery}
                     onChange={(e) => setNlQuery(e.target.value)}
-                    className="w-full pl-10 pr-4 py-2.5 bg-slate-900/90 rounded-xl border border-amber-600/50 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
+                    className="w-full pl-10 pr-12 py-2.5 bg-slate-900/90 rounded-xl border border-amber-600/50 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
+				  
+{/* Microphone Button Triggering Whisper */}
+    <button
+      type="button"
+      onClick={handleWhisperVoiceInput}
+      className="absolute right-3 top-2.5 text-amber-400 hover:text-amber-300 transition p-1"
+      title="Speak in Marwari / Hindi using Whisper AI"
+    >
+      <i data-lucide="mic" className="w-4 h-4"></i>
+    </button>
+                 
+				  
+				  
                 </div>
                 <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold px-5 py-2.5 rounded-xl text-sm transition whitespace-nowrap">Ask AI</button>
               </form>
 
               {nlResponse && (
                 <div className="mt-3 p-2.5 bg-amber-950/90 border border-amber-500/40 rounded-xl text-xs text-amber-100 flex items-center justify-between">
-                  <span><strong>AI Action Executed:</strong> {nlResponse.text}</span>
+                  <span><strong>Assistant Tool Executed:</strong> {nlResponse.text}</span>
                   <button onClick={() => setNlResponse(null)} className="text-amber-300 font-bold ml-2">✕</button>
                 </div>
               )}
             </div>
 
-            {/* TEST TOOLS DRAWER */}
-            {showTestTools && (
+            {/* TEST TOOLS DRAWER (ADMIN ONLY) */}
+            {showTestTools && currentUser.role === 'Admin' && (
               <div className="bg-white rounded-2xl p-5 shadow-md border border-amber-300 space-y-4">
                 <div className="flex items-center justify-between pb-3 border-b border-slate-100">
                   <div className="flex items-center space-x-2">
@@ -629,10 +1247,10 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                 {showJsonInspector && (
                   <div className="mt-3 p-4 bg-slate-900 rounded-xl text-emerald-400 font-mono text-xs overflow-x-auto max-h-60 space-y-2">
                     <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1">
-                      <span>Live State Payload</span>
-                      <span>Total Tasks: {tasks.length} | Products: {products.length} | Workers: {workers.length}</span>
+                      <span>Live State Payload (Including Batches)</span>
+                      <span>Total Tasks: {tasks.length} | Batches: {taskProgressBatches.length}</span>
                     </div>
-                    <pre>{JSON.stringify({ tasks, inventory, products, workers, workerSkills, workerRates }, null, 2)}</pre>
+                    <pre>{JSON.stringify({ tasks, taskProgressBatches, inventory, products, workers, workerSkills, workerRates, users }, null, 2)}</pre>
                   </div>
                 )}
               </div>
@@ -641,8 +1259,8 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
             {/* KPI STAT CARDS */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex flex-col justify-between">
-                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Total Production</span>
-                <div className="mt-2"><div className="text-2xl font-black text-slate-900">{metrics.totalPieces.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span></div></div>
+                <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Completed / Total Target</span>
+                <div className="mt-2"><div className="text-2xl font-black text-slate-900">{metrics.totalPiecesCompleted.toLocaleString()} / {metrics.totalPiecesTarget.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span></div></div>
               </div>
               <div className="bg-white rounded-2xl p-4 shadow-sm border border-slate-200/80 flex flex-col justify-between">
                 <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Gross Worker Labor</span>
@@ -673,80 +1291,123 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                     />
                   </div>
                   <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
-                    <select value={selectedWorker} onChange={(e) => setSelectedWorker(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl border text-sm font-medium text-slate-700">
-                      <option value="All">All Workers</option>
-                      {workers.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
-                    </select>
+                    {currentUser.role === 'Admin' ? (
+                      <select value={selectedWorker} onChange={(e) => setSelectedWorker(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl border text-sm font-medium text-slate-700">
+                        <option value="All">All Workers</option>
+                        {workers.map(w => <option key={w.id} value={w.name}>{w.name}</option>)}
+                      </select>
+                    ) : (
+                      <div className="bg-amber-50 text-amber-900 px-3 py-2 rounded-xl border border-amber-200 text-xs font-bold">
+                        Scoped View: <span className="underline">{workers.find(w => w.id === currentUser.worker_id)?.name || currentUser.username}</span>
+                      </div>
+                    )}
                     <select value={selectedStatus} onChange={(e) => setSelectedStatus(e.target.value)} className="bg-slate-50 px-3 py-2 rounded-xl border text-sm font-medium text-slate-700">
                       <option value="All">All Statuses</option>
-                      <option value="Paid">Paid</option>
-                      <option value="Partial">Partial</option>
                       <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Partial">Partial</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Paid">Paid</option>
                     </select>
-                    <button onClick={() => setIsModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 rounded-xl text-sm flex items-center space-x-1.5 shadow-sm">
-                      <i data-lucide="plus" className="w-4 h-4"></i>
-                      <span>Log Work Slip</span>
-                    </button>
+                    {currentUser.role === 'Admin' && (
+                      <button onClick={() => setIsModalOpen(true)} className="bg-amber-600 hover:bg-amber-700 text-white font-medium px-4 py-2 rounded-xl text-sm flex items-center space-x-1.5 shadow-sm">
+                        <i data-lucide="plus" className="w-4 h-4"></i>
+                        <span>Log Work Slip</span>
+                      </button>
+                    )}
                   </div>
                 </div>
 
                 <div className="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
                   <div className="p-4 bg-slate-50/70 border-b border-slate-200/80 flex items-center justify-between">
-                    <h3 className="font-bold text-slate-800 text-base">Work Orders & Raw Material Issue Ledger</h3>
-                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-800">
-                      {dataSourceMode === 'database' ? '☁️ Cloud DB Active' : '📦 LocalStorage Active'}
+                    <h3 className="font-bold text-slate-800 text-base">
+                      {currentUser.role === 'Admin' ? 'Work Orders & Raw Material Issue Ledger' : 'My Assigned Work Order Slips'}
+                    </h3>
+                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
+                      ☁️ Cloud Sync Active
                     </span>
                   </div>
                   <div className="overflow-x-auto">
-                    <table className="w-full text-left text-sm border-collapse">
+                    <table className="w-full text-left text-sm border-collapse min-w-[700px]">
                       <thead>
                         <tr className="bg-slate-100/70 text-slate-600 uppercase text-[11px] tracking-wider font-semibold border-b">
                           <th className="py-3 px-4">Slip # / Date</th>
                           <th className="py-3 px-4">Worker Name</th>
                           <th className="py-3 px-4">Pagdi Details</th>
                           <th className="py-3 px-4 bg-amber-50/40 text-amber-900 border-x border-amber-100">Issued Raw Material</th>
-                          <th className="py-3 px-4 text-center">Pieces</th>
+                          <th className="py-3 px-4 text-center">Progress (Done / Ordered)</th>
                           <th className="py-3 px-4 text-right">Rate / Pc</th>
                           <th className="py-3 px-4 text-right">Total Payable</th>
                           <th className="py-3 px-4 text-center">Status</th>
+                          <th className="py-3 px-4 text-center">Lifecycle Actions</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
                         {filteredTasks.length === 0 ? (
-                          <tr><td colSpan="8" className="py-8 text-center text-slate-400">No work order slips found matching your filters.</td></tr>
+                          <tr><td colSpan="9" className="py-8 text-center text-slate-400">No work order slips found matching your filters.</td></tr>
                         ) : (
-                          filteredTasks.map((task) => (
-                            <tr key={task.id} className="hover:bg-slate-50 transition">
-                              <td className="py-3.5 px-4 font-mono">
-                                <span className="font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded border">{task.slipNo}</span>
-                                <div className="text-[11px] text-slate-400 mt-1">{task.date}</div>
-                              </td>
-                              <td className="py-3.5 px-4 font-semibold text-slate-800">{task.workerName}</td>
-                              <td className="py-3.5 px-4 font-medium text-slate-700">{task.description}</td>
-                              <td className="py-3.5 px-4 bg-amber-50/20 border-x border-amber-100/60">
-                                {task.subSlipMaterials && task.subSlipMaterials.length > 0 ? (
-                                  <div className="space-y-1">
-                                    {task.subSlipMaterials.map((sub, idx) => (
-                                      <div key={idx} className="font-medium text-slate-800 text-xs flex justify-between bg-white/60 p-1 rounded border border-amber-200/50">
-                                        <span>{sub.name}</span>
-                                        <span className="font-bold text-amber-900 ml-1">{sub.qty} {sub.unit}</span>
-                                      </div>
-                                    ))}
+                          filteredTasks.map((task) => {
+                            const completedPcs = getTaskCompletedPieces(task.id);
+                            const percent = Math.min(100, Math.round((completedPcs / task.piecesReceived) * 100));
+
+                            return (
+                              <tr key={task.id} className="hover:bg-slate-50 transition">
+                                <td className="py-3.5 px-4 font-mono">
+                                  <span className="font-bold text-slate-900 bg-slate-100 px-2 py-1 rounded border">{task.slipNo}</span>
+                                  <div className="text-[11px] text-slate-400 mt-1">{task.date}</div>
+                                </td>
+                                <td className="py-3.5 px-4 font-semibold text-slate-800">{task.workerName}</td>
+                                <td className="py-3.5 px-4 font-medium text-slate-700">{task.description}</td>
+                                <td className="py-3.5 px-4 bg-amber-50/20 border-x border-amber-100/60">
+                                  {task.subSlipMaterials && task.subSlipMaterials.length > 0 ? (
+                                    <div className="space-y-1">
+                                      {task.subSlipMaterials.map((sub, idx) => (
+                                        <div key={idx} className="font-medium text-slate-800 text-xs flex justify-between bg-white/60 p-1 rounded border border-amber-200/50">
+                                          <span>{sub.name}</span>
+                                          <span className="font-bold text-amber-900 ml-1">{sub.qty} {sub.unit}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  ) : (
+                                    <div className="text-slate-500 text-xs italic">{task.materialAllocated || 'No material issued'}</div>
+                                  )}
+                                </td>
+                                <td className="py-3.5 px-4 text-center font-bold text-slate-800">
+                                  <div>
+                                    <span className="text-amber-900 font-black">{completedPcs}</span> / {task.piecesReceived} pcs
                                   </div>
-                                ) : (
-                                  <div className="text-slate-500 text-xs italic">{task.materialAllocated || 'No material issued'}</div>
-                                )}
-                              </td>
-                              <td className="py-3.5 px-4 text-center font-bold text-slate-800">{task.piecesReceived}</td>
-                              <td className="py-3.5 px-4 text-right font-medium">₹{task.ratePerPc}</td>
-                              <td className="py-3.5 px-4 text-right font-bold text-slate-900">₹{task.totalAmount.toLocaleString()}</td>
-                              <td className="py-3.5 px-4 text-center">
-                                <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${task.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : task.status === 'Partial' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
-                                  {task.status}
-                                </span>
-                              </td>
-                            </tr>
-                          ))
+                                  <div className="w-20 bg-slate-200 rounded-full h-1.5 mx-auto mt-1 overflow-hidden">
+                                    <div className="bg-amber-600 h-full" style={{ width: `${percent}%` }}></div>
+                                  </div>
+                                </td>
+                                <td className="py-3.5 px-4 text-right font-medium">₹{task.ratePerPc}</td>
+                                <td className="py-3.5 px-4 text-right font-bold text-slate-900">₹{task.totalAmount.toLocaleString()}</td>
+                                <td className="py-3.5 px-4 text-center">
+                                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-semibold ${task.status === 'Paid' ? 'bg-emerald-100 text-emerald-800' : task.status === 'Completed' ? 'bg-teal-100 text-teal-800' : task.status === 'In Progress' ? 'bg-blue-100 text-blue-800' : task.status === 'Partial' ? 'bg-amber-100 text-amber-800' : 'bg-rose-100 text-rose-800'}`}>
+                                    {task.status}
+                                  </span>
+                                </td>
+                                <td className="py-3.5 px-4 text-center space-x-1 whitespace-nowrap">
+                                  <button
+                                    onClick={() => handleOpenProgressModal(task)}
+                                    className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white rounded-lg text-xs font-bold transition shadow-sm"
+                                    title="Log worker chunk of completed work"
+                                  >
+                                    Log Work Chunk
+                                  </button>
+                                  {currentUser.role === 'Admin' && (
+                                    <button
+                                      onClick={() => handleOpenEditSlipModal(task)}
+                                      className="px-2.5 py-1 bg-slate-200 hover:bg-slate-300 text-slate-700 rounded-lg text-xs font-bold transition"
+                                      title="Edit slip details"
+                                    >
+                                      Edit
+                                    </button>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })
                         )}
                       </tbody>
                     </table>
@@ -755,8 +1416,8 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
               </div>
             )}
 
-            {/* TAB 2: RAW MATERIAL INVENTORY */}
-            {activeTab === 'inventory' && (
+            {/* TAB 2: RAW MATERIAL INVENTORY (ADMIN ONLY) */}
+            {activeTab === 'inventory' && currentUser.role === 'Admin' && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
                 <div className="flex justify-between items-center pb-4 border-b border-slate-100">
                   <div>
@@ -769,7 +1430,7 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                   </button>
                 </div>
                 <div className="overflow-x-auto mt-6">
-                  <table className="w-full text-left text-sm border-collapse">
+                  <table className="w-full text-left text-sm border-collapse min-w-[650px]">
                     <thead>
                       <tr className="bg-slate-100/70 text-slate-600 uppercase text-[11px] tracking-wider font-semibold border-b">
                         <th className="py-3 px-4">Item Code</th>
@@ -803,8 +1464,8 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
               </div>
             )}
 
-            {/* TAB 3: PRODUCT & WORKER MASTERS (WITH TABULAR TOGGLES FOR BOTH) */}
-            {activeTab === 'catalog' && (
+            {/* TAB 3: PRODUCT & WORKER MASTERS (ADMIN ONLY) */}
+            {activeTab === 'catalog' && currentUser.role === 'Admin' && (
               <div className="space-y-6">
                 
                 {/* Product Master Section */}
@@ -847,7 +1508,7 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                     </div>
                   ) : (
                     <div className="overflow-x-auto mt-6">
-                      <table className="w-full text-left text-sm border-collapse">
+                      <table className="w-full text-left text-sm border-collapse min-w-[650px]">
                         <thead>
                           <tr className="bg-slate-100/80 text-slate-600 uppercase text-[11px] font-semibold border-b">
                             <th className="py-3 px-4">Code</th>
@@ -880,12 +1541,12 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                   )}
                 </div>
 
-                {/* Worker Master Section (NOW WITH TABULAR TOGGLE TOO) */}
+                {/* Worker Master Section */}
                 <div className="bg-white rounded-2xl p-6 border shadow-sm">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between pb-4 border-b gap-3">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">Artisan Directory & Custom Negotiated Rates ({workers.length} Artisans)</h3>
-                      <p className="text-xs text-slate-500">Manage worker product skills and custom negotiated piece rates</p>
+                      <p className="text-xs text-slate-500">Manage worker product skills, monthly targets, and custom negotiated piece rates</p>
                     </div>
                     <div className="flex items-center space-x-2">
                       <div className="flex items-center bg-slate-100 p-1 rounded-xl border">
@@ -902,7 +1563,7 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                       {workers.map(w => {
                         const assignedSkills = workerSkills.filter(s => s.worker_id === w.id);
-                     	const assignedRates = workerRates.filter(r => String(r.worker_id).trim() === String(w.id).trim());
+                        const assignedRates = workerRates.filter(r => String(r.worker_id).trim() === String(w.id).trim());
 
                         return (
                           <div key={w.id} className="border rounded-xl p-4 bg-white relative hover:shadow-md transition">
@@ -915,6 +1576,9 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                             </div>
                             <h4 className="font-bold text-slate-900 text-base mt-1">{w.name}</h4>
                             <p className="text-xs text-slate-500">{w.phone} • {w.skillLevel}</p>
+                            <div className="mt-2 text-xs font-medium text-slate-600">
+                              Monthly Capacity: <strong className="text-slate-900">{w.monthlyCapacity || 75} pcs/mo</strong>
+                            </div>
                             
                             <div className="mt-3 pt-3 border-t space-y-2">
                               <span className="text-[11px] font-semibold text-slate-400 block">Custom Negotiated Rates ({assignedRates.length}):</span>
@@ -935,26 +1599,28 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                     </div>
                   ) : (
                     <div className="overflow-x-auto mt-6">
-                      <table className="w-full text-left text-sm border-collapse">
+                      <table className="w-full text-left text-sm border-collapse min-w-[700px]">
                         <thead>
                           <tr className="bg-slate-100/80 text-slate-600 uppercase text-[11px] font-semibold border-b">
                             <th className="py-3 px-4">Worker ID</th>
                             <th className="py-3 px-4">Artisan Name</th>
                             <th className="py-3 px-4">Role / Skill Level</th>
+                            <th className="py-3 px-4">Target Capacity</th>
                             <th className="py-3 px-4">Phone</th>
-                            <th className="py-3 px-4">Skilled Products & Custom Rates</th>
+                            <th className="py-3 px-4">Skilled Products & Rates</th>
                             <th className="py-3 px-4 text-center">Actions</th>
                           </tr>
                         </thead>
                         <tbody className="divide-y divide-slate-100">
                           {workers.map(w => {
                             const assignedSkills = workerSkills.filter(s => s.worker_id === w.id);
-                            const assignedRates = workerRates.filter(r => r.worker_id === w.id);
+                            const assignedRates = workerRates.filter(r => String(r.worker_id).trim() === String(w.id).trim());
                             return (
                               <tr key={w.id} className="hover:bg-slate-50">
                                 <td className="py-3 px-4 font-mono font-bold text-amber-800">{w.id}</td>
                                 <td className="py-3 px-4 font-bold text-slate-900">{w.name}</td>
                                 <td className="py-3 px-4 text-xs">{w.role} ({w.skillLevel})</td>
+                                <td className="py-3 px-4 text-xs font-bold text-slate-800">{w.monthlyCapacity || 75} pcs/mo</td>
                                 <td className="py-3 px-4 text-xs font-mono">{w.phone}</td>
                                 <td className="py-3 px-4">
                                   <div className="flex flex-wrap gap-1">
@@ -985,45 +1651,346 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
               </div>
             )}
 
-            {/* TAB 4: ANALYTICS */}
-            {activeTab === 'summary' && (
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {workerSummary.map(summary => (
-                  <div key={summary.name} className="bg-white rounded-2xl p-5 shadow-sm border border-slate-200/80">
-                    <h4 className="font-bold text-slate-900 text-base">{summary.name}</h4>
-                    <p className="text-xs text-slate-400">{summary.role}</p>
-                    <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                      <div className="bg-slate-50 p-2.5 rounded-xl">
-                        <span className="text-slate-400 block text-[10px]">Total Work Slips</span>
-                        <span className="font-bold text-slate-800 text-sm">{summary.totalTasks}</span>
-                      </div>
-                      <div className="bg-slate-50 p-2.5 rounded-xl">
-                        <span className="text-slate-400 block text-[10px]">Finished Output</span>
-                        <span className="font-bold text-slate-800 text-sm">{summary.totalPieces} pcs</span>
-                      </div>
+            {/* TAB 4: ANALYTICS (ADMIN ONLY) */}
+            {activeTab === 'summary' && currentUser.role === 'Admin' && (
+              <div className="space-y-8">
+                
+                {/* 1. Artisan Workload Heatmap Section */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                  <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
+                    <div>
+                      <h3 className="text-lg font-bold text-slate-900">Artisan Workload & Capacity Heatmap</h3>
+                      <p className="text-xs text-slate-500">Real-time load balancing based on monthly capacity targets (Default: 75 pcs/month)</p>
                     </div>
-                    <div className="mt-4 pt-3 border-t flex justify-between text-xs">
-                      <span>Total Earned: <strong>₹{summary.totalEarned.toLocaleString()}</strong></span>
-                      <span className="text-rose-600">Pending: <strong>₹{summary.balance.toLocaleString()}</strong></span>
+                    <div className="flex items-center space-x-3 text-xs font-bold">
+                      <span className="flex items-center text-emerald-700"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></span>Free (&lt;50%)</span>
+                      <span className="flex items-center text-amber-700"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-1.5"></span>Loaded (50-85%)</span>
+                      <span className="flex items-center text-rose-700"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 mr-1.5"></span>Busy (&gt;85%)</span>
                     </div>
                   </div>
-                ))}
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                    {workerSummary.map(summary => {
+                      const capacity = summary.monthlyCapacity || 75;
+                      const loadPct = Math.min(100, Math.round((summary.totalCompletedPieces / capacity) * 100));
+                      const isBusy = loadPct > 85;
+                      const isLoaded = loadPct >= 50 && loadPct <= 85;
+
+                      const statusColor = isBusy ? 'bg-rose-500 text-rose-900' : isLoaded ? 'bg-amber-500 text-amber-900' : 'bg-emerald-500 text-emerald-900';
+                      const badgeBg = isBusy ? 'bg-rose-100 text-rose-800 border-rose-200' : isLoaded ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                      const badgeLabel = isBusy ? 'BUSY / OVERLOADED' : isLoaded ? 'MODERATE LOAD' : 'AVAILABLE / FREE';
+
+                      return (
+                        <div key={summary.name} className="bg-slate-50 rounded-2xl p-5 border border-slate-200/90 relative hover:shadow-md transition">
+                          <div className="flex justify-between items-start">
+                            <div>
+                              <h4 className="font-bold text-slate-900 text-base">{summary.name}</h4>
+                              <p className="text-xs text-slate-500">{summary.role}</p>
+                            </div>
+                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${badgeBg}`}>
+                              {badgeLabel}
+                            </span>
+                          </div>
+
+                          {/* Workload Progress Bar */}
+                          <div className="mt-4">
+                            <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                              <span>Monthly Workload (Done / Target)</span>
+                              <span>{summary.totalCompletedPieces} / {capacity} pcs ({loadPct}%)</span>
+                            </div>
+                            <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                              <div className={`h-full transition-all duration-500 ${statusColor}`} style={{ width: `${loadPct}%` }}></div>
+                            </div>
+                          </div>
+
+                          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                              <span className="text-slate-400 block text-[10px]">Work Orders Logged</span>
+                              <span className="font-extrabold text-slate-800 text-sm">{summary.totalTasks} Slips</span>
+                            </div>
+                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                              <span className="text-slate-400 block text-[10px]">Total Labor Earned</span>
+                              <span className="font-extrabold text-slate-800 text-sm">₹{summary.totalEarned.toLocaleString()}</span>
+                            </div>
+                          </div>
+
+                          <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-xs font-semibold">
+                            <span className="text-slate-500">Paid: ₹{summary.totalPaid.toLocaleString()}</span>
+                            <span className="text-rose-600">Pending: ₹{summary.balance.toLocaleString()}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* 2. Work-In-Progress (WIP) Tracker per Master Item */}
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
+                  <div className="pb-4 border-b border-slate-100">
+                    <h3 className="text-lg font-bold text-slate-900">Work-In-Progress (WIP) Production Tracker</h3>
+                    <p className="text-xs text-slate-500">Live active production completed vs baseline ordered quantities by Pagdi Product Master</p>
+                  </div>
+
+                  <div className="overflow-x-auto mt-6">
+                    <table className="w-full text-left text-sm border-collapse min-w-[650px]">
+                      <thead>
+                        <tr className="bg-slate-100/70 text-slate-600 uppercase text-[11px] tracking-wider font-semibold border-b">
+                          <th className="py-3 px-4">Code</th>
+                          <th className="py-3 px-4">Product Master Specification</th>
+                          <th className="py-3 px-4">Category</th>
+                          <th className="py-3 px-4 text-center">Active Work Slips</th>
+                          <th className="py-3 px-4 text-right">Progress (Done / Target)</th>
+                          <th className="py-3 px-4 text-right">Gross Labor Value</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-slate-100">
+                        {wipProductSummary.map(wip => (
+                          <tr key={wip.id} className="hover:bg-slate-50">
+                            <td className="py-3.5 px-4 font-mono font-bold text-amber-800">{wip.id}</td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900">{wip.name}</td>
+                            <td className="py-3.5 px-4"><span className="bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 rounded-full">{wip.category}</span></td>
+                            <td className="py-3.5 px-4 text-center font-semibold text-slate-800">{wip.activeSlips} slips</td>
+                            <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900">{wip.totalCompletedPieces.toLocaleString()} / {wip.totalTargetPieces.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span></td>
+                            <td className="py-3.5 px-4 text-right font-bold text-emerald-600">₹{wip.grossValue.toLocaleString()}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
             )}
 
           </main>
 
+          {/* DISCREET FOOTER WITH DATA SOURCE SWITCHER FLAG */}
+          <footer className="mt-auto bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center space-x-2">
+                <span className="font-bold text-slate-200">Sahi Taj ERP System</span>
+                <span>• Pagdi Operations Portal</span>
+              </div>
+              
+              <div className="flex items-center space-x-2 bg-slate-800 p-1 rounded-xl border border-slate-700 text-[11px]">
+                <span className="text-slate-400 px-2 font-medium">Data Engine:</span>
+                <button
+                  onClick={() => setDataSourceMode('database')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition ${dataSourceMode === 'database' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-slate-300 hover:text-white'}`}
+                >
+                  ☁️ Supabase Cloud DB
+                </button>
+                <button
+                  onClick={() => setDataSourceMode('mock')}
+                  className={`px-2.5 py-1 rounded-lg font-bold transition ${dataSourceMode === 'mock' ? 'bg-amber-500 text-amber-950 shadow' : 'text-slate-300 hover:text-white'}`}
+                >
+                  📦 LocalStorage (Mock)
+                </button>
+              </div>
+            </div>
+          </footer>
+
+          {/* WORK SLIP LIFECYCLE: LOG WORK CHUNK MODAL (IMMUTABLE BASELINE TASK MODEL) */}
+          {isProgressModalOpen && activeTaskToUpdate && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border my-auto max-h-[85vh] overflow-y-auto">
+                <div className="flex justify-between items-center pb-3 border-b mb-4">
+                  <div>
+                    <h3 className="text-base font-bold text-slate-900">Log Worker Work Chunk</h3>
+                    <p className="text-xs text-slate-500 font-mono">Slip: {activeTaskToUpdate.slipNo} • {activeTaskToUpdate.description}</p>
+                  </div>
+                  <button onClick={() => setIsProgressModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                </div>
+
+                <form onSubmit={handleProgressSubmit} className="space-y-4">
+                  <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs space-y-1">
+                    <div className="flex justify-between"><span>Original Order Size (Immutable Target):</span><strong className="text-amber-950">{activeTaskToUpdate.piecesReceived} pcs</strong></div>
+                    <div className="flex justify-between"><span>Current Completed Pieces:</span><strong className="text-amber-900">{getTaskCompletedPieces(activeTaskToUpdate.id)} pcs</strong></div>
+                    <div className="flex justify-between"><span>Current Status:</span><strong className="text-amber-900">{activeTaskToUpdate.status}</strong></div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Log Completed Work Chunk (Pieces Completed in this batch)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      placeholder="e.g. 15"
+                      value={progressUpdateForm.piecesChunk}
+                      onChange={(e) => setProgressUpdateForm({ ...progressUpdateForm, piecesChunk: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm focus:ring-2 focus:ring-amber-500/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Update Status Progression *</label>
+                    <select
+                      value={progressUpdateForm.newStatus}
+                      onChange={(e) => setProgressUpdateForm({ ...progressUpdateForm, newStatus: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm font-semibold"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Partial">Partial</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Paid">Paid</option>
+                    </select>
+                  </div>
+
+                  {currentUser.role === 'Admin' && (
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Log Payout / Advance Payment (₹)</label>
+                      <input
+                        type="number"
+                        min="0"
+                        placeholder="e.g. 1000"
+                        value={progressUpdateForm.paidIncrement}
+                        onChange={(e) => setProgressUpdateForm({ ...progressUpdateForm, paidIncrement: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Chunk Notes / Remarks</label>
+                    <textarea
+                      rows="2"
+                      value={progressUpdateForm.notes}
+                      onChange={(e) => setProgressUpdateForm({ ...progressUpdateForm, notes: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm"
+                      placeholder="Add batch notes..."
+                    ></textarea>
+                  </div>
+
+                  {/* PREVIOUS WORK CHUNKS LEDGER INSPECTOR */}
+                  <div className="mt-3 pt-3 border-t">
+                    <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Previous Chunk Logs for this Slip:</span>
+                    <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
+                      {taskProgressBatches.filter(b => String(b.task_id) === String(activeTaskToUpdate.id)).map(b => (
+                        <div key={b.id} className="bg-slate-50 p-2 rounded-lg border text-xs flex justify-between items-center">
+                          <div>
+                            <span className="font-bold text-amber-900">+{b.pieces_completed} pcs</span>
+                            <span className="text-slate-400 text-[10px] ml-2">{b.notes || 'Batch'}</span>
+                          </div>
+                          <span className="text-[10px] text-slate-400">{new Date(b.created_at).toLocaleDateString()}</span>
+                        </div>
+                      ))}
+                      {taskProgressBatches.filter(b => String(b.task_id) === String(activeTaskToUpdate.id)).length === 0 && (
+                        <span className="text-xs text-slate-400 italic">No previous work chunks logged yet.</span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-3 border-t">
+                    <button type="button" onClick={() => setIsProgressModalOpen(false)} className="px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+                    <button type="submit" className="px-5 py-2 text-xs font-bold bg-amber-600 text-white rounded-xl shadow">Log Chunk Entry</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
+          {/* ADMIN EDIT SLIP MODAL */}
+          {isEditSlipModalOpen && activeTaskToEdit && currentUser.role === 'Admin' && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border my-auto max-h-[85vh] overflow-y-auto">
+                <div className="flex justify-between items-center pb-3 border-b mb-4">
+                  <h3 className="text-base font-bold text-slate-900">Edit Work Slip (Admin Audit)</h3>
+                  <button onClick={() => setIsEditSlipModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold">✕</button>
+                </div>
+
+                <form onSubmit={handleEditSlipSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Slip No *</label>
+                    <input
+                      type="text"
+                      required
+                      value={editSlipForm.slipNo}
+                      onChange={(e) => setEditSlipForm({ ...editSlipForm, slipNo: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Original Order Size *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={editSlipForm.piecesReceived}
+                        onChange={(e) => setEditSlipForm({ ...editSlipForm, piecesReceived: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm font-bold"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 mb-1">Rate / Pc (₹) *</label>
+                      <input
+                        type="number"
+                        min="1"
+                        required
+                        value={editSlipForm.ratePerPc}
+                        onChange={(e) => setEditSlipForm({ ...editSlipForm, ratePerPc: e.target.value })}
+                        className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm font-bold text-amber-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Total Paid Amount (₹)</label>
+                    <input
+                      type="number"
+                      min="0"
+                      value={editSlipForm.paidAmount}
+                      onChange={(e) => setEditSlipForm({ ...editSlipForm, paidAmount: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Status *</label>
+                    <select
+                      value={editSlipForm.status}
+                      onChange={(e) => setEditSlipForm({ ...editSlipForm, status: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm"
+                    >
+                      <option value="Pending">Pending</option>
+                      <option value="In Progress">In Progress</option>
+                      <option value="Partial">Partial</option>
+                      <option value="Completed">Completed</option>
+                      <option value="Paid">Paid</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Notes / Audit Remarks</label>
+                    <textarea
+                      rows="2"
+                      value={editSlipForm.notes}
+                      onChange={(e) => setEditSlipForm({ ...editSlipForm, notes: e.target.value })}
+                      className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm"
+                    ></textarea>
+                  </div>
+
+                  <div className="flex justify-end space-x-3 pt-3 border-t">
+                    <button type="button" onClick={() => setIsEditSlipModalOpen(false)} className="px-4 py-2 text-xs font-bold text-slate-600">Cancel</button>
+                    <button type="submit" className="px-5 py-2 text-xs font-bold bg-amber-600 text-white rounded-xl shadow">Save Slip Edits</button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
+
           {/* ADD WORK ORDER MODAL WITH MULTI-MATERIAL SUB-SLIP ITEMIZER */}
-          {isModalOpen && (
-            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white rounded-2xl max-w-xl w-full p-6 shadow-2xl border my-8">
-                <div className="flex justify-between items-center pb-4 border-b">
-                  <h3 className="text-lg font-bold text-slate-900">Issue Artisan Work Order Slip</h3>
-                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600">✕</button>
+          {isModalOpen && currentUser.role === 'Admin' && (
+            <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto">
+              <div className="bg-white rounded-2xl max-w-xl w-full p-5 sm:p-6 shadow-2xl border my-auto max-h-[85vh] overflow-y-auto">
+                <div className="flex justify-between items-center pb-3 border-b sticky top-0 bg-white z-10">
+                  <h3 className="text-base sm:text-lg font-bold text-slate-900">Issue Artisan Work Order Slip</h3>
+                  <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 font-bold p-1">✕</button>
                 </div>
 
                 <form onSubmit={handleAddTaskSubmit} className="mt-4 space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <label className="block text-xs font-bold text-slate-700 mb-1">Slip No *</label>
                       <input type="text" required placeholder="e.g. A153" value={newTask.slipNo} onChange={(e) => setNewTask({ ...newTask, slipNo: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm" />
@@ -1043,8 +2010,7 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                     </select>
                   </div>
 
-                  {/* Multi-Material Sub-Slip Itemizer */}
-                  <div className="p-4 bg-amber-50/60 rounded-xl border border-amber-200 space-y-3">
+                  <div className="p-3 sm:p-4 bg-amber-50/60 rounded-xl border border-amber-200 space-y-3">
                     <span className="text-xs font-bold text-amber-900">Raw Material Issuance Sub-Slip</span>
                     <div className="grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
                       <div className="sm:col-span-5">
@@ -1103,9 +2069,9 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
           )}
 
           {/* RESTOCK MODAL */}
-          {isRestockModalOpen && (
+          {isRestockModalOpen && currentUser.role === 'Admin' && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border my-auto max-h-[85vh] overflow-y-auto">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">Restock Raw Material Inventory</h3>
                 <form onSubmit={handleRestockSubmit} className="space-y-4">
                   <select value={restockData.materialId} onChange={(e) => setRestockData({ ...restockData, materialId: e.target.value })} className="w-full px-3 py-2 bg-slate-50 rounded-xl border text-sm">
@@ -1122,9 +2088,9 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
           )}
 
           {/* PRODUCT ADD/EDIT MODAL */}
-          {isProductModalOpen && (
+          {isProductModalOpen && currentUser.role === 'Admin' && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-              <div className="bg-white rounded-2xl max-w-md w-full p-6 border shadow-2xl">
+              <div className="bg-white rounded-2xl max-w-md w-full p-6 border shadow-2xl my-auto max-h-[85vh] overflow-y-auto">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">{products.find(p => p.id === productForm.id) ? 'Edit Product Master' : 'Add New Product Master'}</h3>
                 <form onSubmit={handleSaveProduct} className="space-y-3">
                   <div>
@@ -1158,10 +2124,10 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
             </div>
           )}
 
-          {/* WORKER ADD/EDIT & CUSTOM RATES MODAL */}
-          {isWorkerModalOpen && (
+          {/* WORKER ADD/EDIT MODAL */}
+          {isWorkerModalOpen && currentUser.role === 'Admin' && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-2xl my-8">
+              <div className="bg-white rounded-2xl max-w-lg w-full p-6 border shadow-2xl my-auto max-h-[85vh] overflow-y-auto">
                 <h3 className="text-lg font-bold text-slate-900 mb-4">{workers.find(w => w.id === workerForm.id) ? 'Edit Worker & Custom Rates' : 'Register New Worker'}</h3>
                 <form onSubmit={handleSaveWorker} className="space-y-4">
                   <div className="grid grid-cols-2 gap-3">
@@ -1173,6 +2139,11 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
                       <label className="block text-xs font-bold text-slate-700 mb-1">Worker Name</label>
                       <input type="text" required value={workerForm.name} onChange={e => setWorkerForm({ ...workerForm, name: e.target.value })} className="w-full px-3 py-2 bg-slate-50 border rounded-xl text-sm" />
                     </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 mb-1">Monthly Production Capacity (Pieces / Month) *</label>
+                    <input type="number" min="1" required placeholder="Default: 75" value={workerForm.monthlyCapacity} onChange={e => setWorkerForm({ ...workerForm, monthlyCapacity: e.target.value })} className="w-full px-3 py-2 bg-amber-50 border border-amber-300 font-bold text-amber-900 rounded-xl text-sm" />
                   </div>
 
                   <div>
@@ -1210,7 +2181,7 @@ setWorkerRates([...updatedRates]); // Spread array to force React state re-rende
           )}
 
           {/* WARNING CONFIRMATION POPUP MODAL */}
-          {deleteWarning.isOpen && (
+          {deleteWarning.isOpen && currentUser.role === 'Admin' && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl max-w-sm w-full p-6 border shadow-2xl text-center">
                 <div className="w-12 h-12 rounded-full bg-rose-100 text-rose-600 flex items-center justify-center mx-auto mb-3 font-bold text-xl">⚠️</div>
