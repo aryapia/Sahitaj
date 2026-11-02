@@ -17,6 +17,8 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <!-- Supabase JS Client Library -->
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Fuse.js Fuzzy Search Library -->
+  <script src="https://cdn.jsdelivr.net/npm/fuse.js@6.6.2/dist/fuse.min.js"></script>
 
   <style>
     body { font-family: 'Inter', sans-serif; }
@@ -32,90 +34,9 @@
     const SUPABASE_URL = 'https://iusblrlthsmmxsyxwyss.supabase.co';
     const SUPABASE_ANON_KEY = 'sb_publishable_5FXaUCAeEf0nbS-I1NkSew_1ae-lKZ6';
     
-    
-
-
-
     const supabase = (SUPABASE_URL !== 'YOUR_SUPABASE_URL_HERE') 
         ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) 
         : null;
-
-    // --- INITIAL MOCK DATA FALLBACKS ---
-    const INITIAL_USERS = [
-      { id: 1, username: 'admin', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Admin', worker_id: null },
-      { id: 2, username: 'surendra', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-01' },
-      { id: 3, username: 'ramesh', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-02' },
-      { id: 4, username: 'mohan', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-03' },
-      { id: 5, username: 'bheru', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-04' },
-      { id: 6, username: 'nathu', password_hash: '8c6976e5b5410415bde908bd4dee15dfb167a9c873fc4bb8a81f6f2ab448a918', role: 'Worker', worker_id: 'WKR-05' }
-    ];
-
-    const INITIAL_INVENTORY = [
-      { id: 'RM-01', name: 'Cotton Base Fabric (Pure Saffron)', unit: 'Meters', stock: 1200, minAlert: 200, category: 'Fabric' },
-      { id: 'RM-02', name: 'Marwari Velvet Trim Band', unit: 'Meters', stock: 450, minAlert: 100, category: 'Fabric' },
-      { id: 'RM-03', name: 'Silk Blend Ceremonial Cloth', unit: 'Meters', stock: 180, minAlert: 150, category: 'Fabric' },
-      { id: 'RM-04', name: 'Bandhani Leheriya Cloth', unit: 'Meters', stock: 850, minAlert: 250, category: 'Fabric' },
-      { id: 'RM-05', name: 'Structured Cotton Pre-stitched Base', unit: 'Pieces', stock: 320, minAlert: 50, category: 'Ready Base' },
-      { id: 'RM-06', name: 'Chanderi Motif Print Cloth', unit: 'Meters', stock: 600, minAlert: 100, category: 'Fabric' },
-      { id: 'RM-07', name: 'Gold Brocade Tissue Fabric', unit: 'Meters', stock: 95, minAlert: 100, category: 'Luxury Fabric' },
-      { id: 'RM-08', name: 'Zari Golden Border Ribbon', unit: 'Meters', stock: 1500, minAlert: 300, category: 'Trims' },
-      { id: 'RM-09', name: 'Royal Dye Compound (Kesariya / Red)', unit: 'Kg', stock: 45, minAlert: 10, category: 'Chemicals' },
-      { id: 'RM-10', name: 'Decorative Metallic Pearl Beads', unit: 'Kg', stock: 25, minAlert: 5, category: 'Embellishment' }
-    ];
-
-    const INITIAL_PRODUCTS = [
-      { id: 'PRD-01', name: 'Royal Marwari Zari Pagdi', category: 'Traditional', clothLength: '6 Mtr', clothType: '6 Meter Cotton', color: 'Kesariya / Saffron', defaultRate: 150, mrp: 750, reqMaterialId: 'RM-01', reqQtyPerPc: 6, description: 'Heavy gold zari border with traditional knotting' },
-      { id: 'PRD-02', name: 'Ceremonial Bandhani Safa', category: 'Leheriya', clothLength: '7.5 Mtr', clothType: 'Bandhani Cloth', color: 'Multicolor Pink/Yellow', defaultRate: 120, mrp: 600, reqMaterialId: 'RM-04', reqQtyPerPc: 7.5, description: 'Vibrant tie-dye pattern for weddings and ceremonies' },
-      { id: 'PRD-03', name: 'Groom’s Royal Mewari Pagdi', category: 'Bridal Luxury', clothLength: '9 Mtr', clothType: 'Silk Blend Cloth', color: 'Golden Amber', defaultRate: 250, mrp: 1200, reqMaterialId: 'RM-03', reqQtyPerPc: 9, description: 'Elaborate regal turban with kalgi mount and velvet band' },
-      { id: 'PRD-04', name: 'Velvet Brocade Festive Turban', category: 'Festive', clothLength: '6 Mtr', clothType: 'Velvet Trim Band', color: 'Deep Red', defaultRate: 180, mrp: 900, reqMaterialId: 'RM-02', reqQtyPerPc: 6, description: 'Rich velvet trim with gold brocade finishing' },
-      { id: 'PRD-05', name: 'Traditional Jaipur Mothra Safa', category: 'Traditional', clothLength: '6 Mtr', clothType: 'Cotton Base', color: 'Multi Checkered', defaultRate: 140, mrp: 700, reqMaterialId: 'RM-01', reqQtyPerPc: 6, description: 'Classic multi-colored checkered pattern tie-dye' },
-      { id: 'PRD-06', name: 'Rajputana Chunari Pagdi', category: 'Bridal Luxury', clothLength: '7.5 Mtr', clothType: 'Bandhani Cloth', color: 'Dotted Red', defaultRate: 220, mrp: 1100, reqMaterialId: 'RM-04', reqQtyPerPc: 7.5, description: 'Fine-tied dotted pattern with ceremonial finish' },
-      { id: 'PRD-07', name: 'Designer Tissue Gold Safa', category: 'Designer', clothLength: '9 Mtr', clothType: 'Tissue Brocade', color: 'Gold / Cream', defaultRate: 200, mrp: 1000, reqMaterialId: 'RM-07', reqQtyPerPc: 9, description: 'Lightweight shimmering tissue fabric for modern receptions' }
-    ];
-
-    const INITIAL_WORKERS = [
-      { id: 'WKR-01', name: 'Surendra Ji', role: 'Master Craftsman', phone: '+91 98290 11111', skillLevel: 'Master Artisan', monthlyCapacity: 75 },
-      { id: 'WKR-02', name: 'Ramesh Ji', role: 'Stitching Specialist', phone: '+91 94140 22222', skillLevel: 'Senior Specialist', monthlyCapacity: 75 },
-      { id: 'WKR-03', name: 'Mohan Lal', role: 'Craftsman', phone: '+91 97850 33333', skillLevel: 'Craftsman', monthlyCapacity: 75 },
-      { id: 'WKR-04', name: 'Bheru Singh', role: 'Embellishment Master', phone: '+91 91660 44444', skillLevel: 'Master Artisan', monthlyCapacity: 75 },
-      { id: 'WKR-05', name: 'Nathu Lal', role: 'Dyeing & Pleating Specialist', phone: '+91 99280 55555', skillLevel: 'Senior Specialist', monthlyCapacity: 75 }
-    ];
-
-    const INITIAL_WORKER_SKILLS = [
-      { worker_id: 'WKR-01', product_id: 'PRD-01' }, { worker_id: 'WKR-01', product_id: 'PRD-03' }, { worker_id: 'WKR-01', product_id: 'PRD-04' }, { worker_id: 'WKR-01', product_id: 'PRD-06' }, { worker_id: 'WKR-01', product_id: 'PRD-07' },
-      { worker_id: 'WKR-02', product_id: 'PRD-02' }, { worker_id: 'WKR-02', product_id: 'PRD-04' }, { worker_id: 'WKR-02', product_id: 'PRD-05' }, { worker_id: 'WKR-02', product_id: 'PRD-07' },
-      { worker_id: 'WKR-03', product_id: 'PRD-01' }, { worker_id: 'WKR-03', product_id: 'PRD-02' }, { worker_id: 'WKR-03', product_id: 'PRD-05' }, { worker_id: 'WKR-03', product_id: 'PRD-06' },
-      { worker_id: 'WKR-04', product_id: 'PRD-03' }, { worker_id: 'WKR-04', product_id: 'PRD-06' }, { worker_id: 'WKR-04', product_id: 'PRD-07' },
-      { worker_id: 'WKR-05', product_id: 'PRD-01' }, { worker_id: 'WKR-05', product_id: 'PRD-02' }, { worker_id: 'WKR-05', product_id: 'PRD-04' }
-    ];
-
-    const INITIAL_WORKER_RATES = [
-      { worker_id: 'WKR-01', product_id: 'PRD-03', custom_rate: 280 },
-      { worker_id: 'WKR-01', product_id: 'PRD-06', custom_rate: 240 },
-      { worker_id: 'WKR-02', product_id: 'PRD-02', custom_rate: 135 },
-      { worker_id: 'WKR-04', product_id: 'PRD-03', custom_rate: 290 },
-      { worker_id: 'WKR-05', product_id: 'PRD-04', custom_rate: 190 }
-    ];
-
-    const INITIAL_TASKS = [
-      {
-        id: 'TSK-1001', slipNo: 'A137', workerId: 'WKR-01', workerName: 'Surendra Ji', productId: 'PRD-03', date: '2026-10-28', description: 'Groom’s Royal Mewari Pagdi', piecesReceived: 50, ratePerPc: 280, totalAmount: 14000, paidAmount: 14000, status: 'Paid',
-        subSlipMaterials: [{ id: 'RM-03', name: 'Silk Blend Ceremonial Cloth', qty: 450, unit: 'Meters', type: 'Length' }],
-        materialAllocated: 'Silk Blend Ceremonial Cloth (450 Meters)', notes: 'Custom artisan rate applied'
-      },
-      {
-        id: 'TSK-1002', slipNo: 'A138', workerId: 'WKR-02', workerName: 'Ramesh Ji', productId: 'PRD-02', date: '2026-10-30', description: 'Ceremonial Bandhani Safa', piecesReceived: 30, ratePerPc: 135, totalAmount: 4050, paidAmount: 2000, status: 'Partial',
-        subSlipMaterials: [{ id: 'RM-04', name: 'Bandhani Leheriya Cloth', qty: 225, unit: 'Meters', type: 'Length' }],
-        materialAllocated: 'Bandhani Leheriya Cloth (225 Meters)', notes: 'Balance due next week'
-      }
-    ];
-
-    // INITIAL PROGRESS CHUNKS LOGS (FOR IMMUTABLE TASK RECORD MODEL)
-    const INITIAL_PROGRESS_BATCHES = [
-      { id: 101, task_id: 'TSK-1001', pieces_completed: 30, created_at: '2026-10-29 10:00:00', notes: 'Initial batch completed cleanly.' },
-      { id: 102, task_id: 'TSK-1001', pieces_completed: 20, created_at: '2026-10-30 16:30:00', notes: 'Final batch completed and verified.' },
-      { id: 103, task_id: 'TSK-1002', pieces_completed: 15, created_at: '2026-10-31 11:15:00', notes: 'First half completed.' }
-    ];
 
     // Helper for SHA-256 password hashing
     async function hashPassword(str) {
@@ -126,123 +47,108 @@
     }
 
     function App() {
-	
-	// --- OPENAI DEMO KEY PLACEHOLDER ---
-    // You can set your OpenAI API key here for direct LLM processing during demo
-    const OPENAI_API_KEY = '';
-	
-	const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+      // --- OPENAI DEMO KEY PLACEHOLDER ---
+      const OPENAI_API_KEY = '';
+      
+      const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
       const speechRecognizer = SpeechRecognition ? new SpeechRecognition() : null;
       if (speechRecognizer) {
         speechRecognizer.lang = 'hi-IN';
         speechRecognizer.continuous = false;
         speechRecognizer.interimResults = false;
       }
-	  
-	  // Function to record microphone audio and transcribe via OpenAI Whisper API
-const handleWhisperVoiceInput = async () => {
-  if (!OPENAI_API_KEY || OPENAI_API_KEY === 'YOUR_OPENAI_API_KEY_HERE') {
-    alert('Please insert your OpenAI API key in the OPENAI_API_KEY variable first.');
-    return;
-  }
-
-  try {
-  
-    // Request microphone access
-    const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-    const mediaRecorder = new MediaRecorder(stream);
-    let audioChunks = [];
-
-    mediaRecorder.ondataavailable = (event) => {
-      if (event.data.size > 0) {
-        audioChunks.push(event.data);
-      }
-    };
-
-    mediaRecorder.onstop = async () => {
-      // Create audio blob from recorded chunks
-      const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
-      const audioFile = new File([audioBlob], 'voice_prompt.webm', { type: 'audio/webm' });
-
-      // Prepare Form Data for OpenAI Whisper API
-      const formData = new FormData();
-      formData.append('file', audioFile);
-      formData.append('model', 'whisper-1');
-      // Optional: Give Whisper a prompt context to help it recognize domain words like "Pagdi", "Safa", or worker names
-      //formData.append('prompt', 'Sahi Taj ERP, Pagdi, Safa, Surendra Ji, Ramesh Ji, stock, raw material');
-	  //formData.append('prompt', 'Sahi Taj ERP, Safa, Ramesh ji ka order check karo, stock, raw material, written in Roman script / Hinglish');
-	
-
-      setNlQuery('Transcribing audio with Whisper...');
-
-      try {
-        const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${OPENAI_API_KEY}`
-          },
-          body: formData
-        });
-
-        const data = await response.json();
-        if (data.text) {
-          setNlQuery(data.text);
-          handleNlQuerySubmit(data.text); // Automatically trigger your search/assistant logic
-        } else {
-          setNlQuery('');
-          alert('Transcription failed: ' + (data.error?.message || 'Unknown error'));
+      
+      // Function to record microphone audio and transcribe via OpenAI Whisper API
+      const handleWhisperVoiceInput = async () => {
+        if (!OPENAI_API_KEY || OPENAI_API_KEY === 'YOUR_OPENAI_API_KEY_HERE') {
+          alert('Please insert your OpenAI API key in the OPENAI_API_KEY variable first.');
+          return;
         }
-      } catch (err) {
-        console.error('Whisper API Error:', err);
-        setNlQuery('');
-        alert('Network error while connecting to Whisper API.');
-      }
 
-      // Stop all microphone tracks
-      stream.getTracks().forEach(track => track.stop());
-    };
+        try {
+          const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+          const mediaRecorder = new MediaRecorder(stream);
+          let audioChunks = [];
 
-    // Start recording
-    mediaRecorder.start();
-    setNlQuery('Listening... Speak now (Marwari/Hindi/English)');
+          mediaRecorder.ondataavailable = (event) => {
+            if (event.data.size > 0) {
+              audioChunks.push(event.data);
+            }
+          };
 
-    // Automatically stop recording after 5 seconds (or add a stop button if preferred)
-    setTimeout(() => {
-      if (mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
-      }
-    }, 5000);
+          mediaRecorder.onstop = async () => {
+            const audioBlob = new Blob(audioChunks, { type: 'audio/webm' });
+            const audioFile = new File([audioBlob], 'voice_prompt.webm', { type: 'audio/webm' });
 
-  } catch (err) {
-    console.error('Microphone access denied or not supported:', err);
-    alert('Could not access microphone. Please check browser permissions.');
-  }
-};
-	  
-      // Data Source Mode Defaults to Cloud DB
-      const [dataSourceMode, setDataSourceMode] = useState('database');
+            const formData = new FormData();
+            formData.append('file', audioFile);
+            formData.append('model', 'whisper-1');
+
+            setNlQuery('Transcribing audio with Whisper...');
+
+            try {
+              const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+                method: 'POST',
+                headers: {
+                  'Authorization': `Bearer ${OPENAI_API_KEY}`
+                },
+                body: formData
+              });
+
+              const data = await response.json();
+              if (data.text) {
+                setNlQuery(data.text);
+                handleNlQuerySubmit(data.text);
+              } else {
+                setNlQuery('');
+                alert('Transcription failed: ' + (data.error?.message || 'Unknown error'));
+              }
+            } catch (err) {
+              console.error('Whisper API Error:', err);
+              setNlQuery('');
+              alert('Network error while connecting to Whisper API.');
+            }
+
+            stream.getTracks().forEach(track => track.stop());
+          };
+
+          mediaRecorder.start();
+          setNlQuery('Listening... Speak now (Marwari/Hindi/English)');
+
+          setTimeout(() => {
+            if (mediaRecorder.state === 'recording') {
+              mediaRecorder.stop();
+            }
+          }, 5000);
+
+        } catch (err) {
+          console.error('Microphone access denied or not supported:', err);
+          alert('Could not access microphone. Please check browser permissions.');
+        }
+      };
+        
       const [activeTab, setActiveTab] = useState('tasks');
       
       // Authentication & RBAC State
-      const [users, setUsers] = useState(() => JSON.parse(localStorage.getItem('st_users')) || INITIAL_USERS);
-      const [currentUser, setCurrentUser] = useState(() => JSON.parse(localStorage.getItem('st_current_user')) || null);
+      const [users, setUsers] = useState([]);
+      const [currentUser, setCurrentUser] = useState(null);
       const [loginForm, setLoginForm] = useState({ username: '', password: '' });
       const [loginError, setLoginError] = useState('');
 
-      // Separate View Switchers for Product & Worker Masters
+      // View Switchers for Product & Worker Masters
       const [masterViewMode, setMasterViewMode] = useState('grid');
       const [workerViewMode, setWorkerViewMode] = useState('grid');
 
-      // State Initializations with localStorage persistence for Mock Mode
-      const [tasks, setTasks] = useState(() => JSON.parse(localStorage.getItem('st_tasks')) || INITIAL_TASKS);
-      const [taskProgressBatches, setTaskProgressBatches] = useState(() => JSON.parse(localStorage.getItem('st_task_batches')) || INITIAL_PROGRESS_BATCHES);
-      const [inventory, setInventory] = useState(() => JSON.parse(localStorage.getItem('st_inventory')) || INITIAL_INVENTORY);
-      const [products, setProducts] = useState(() => JSON.parse(localStorage.getItem('st_products')) || INITIAL_PRODUCTS);
-      const [workers, setWorkers] = useState(() => JSON.parse(localStorage.getItem('st_workers')) || INITIAL_WORKERS);
-      const [workerSkills, setWorkerSkills] = useState(() => JSON.parse(localStorage.getItem('st_skills')) || INITIAL_WORKER_SKILLS);
-      const [workerRates, setWorkerRates] = useState(() => JSON.parse(localStorage.getItem('st_rates')) || INITIAL_WORKER_RATES);
+      // State Initializations without localStorage or mock fallbacks
+      const [tasks, setTasks] = useState([]);
+      const [taskProgressBatches, setTaskProgressBatches] = useState([]);
+      const [inventory, setInventory] = useState([]);
+      const [products, setProducts] = useState([]);
+      const [workers, setWorkers] = useState([]);
+      const [workerSkills, setWorkerSkills] = useState([]);
+      const [workerRates, setWorkerRates] = useState([]);
 
-      // Work Slip Lifecycle Modal State (For Workers / Admins to log work chunks)
+      // Work Slip Lifecycle Modal State
       const [isProgressModalOpen, setIsProgressModalOpen] = useState(false);
       const [activeTaskToUpdate, setActiveTaskToUpdate] = useState(null);
       const [progressUpdateForm, setProgressUpdateForm] = useState({ piecesChunk: '', newStatus: 'In Progress', paidIncrement: '', notes: '' });
@@ -252,27 +158,9 @@ const handleWhisperVoiceInput = async () => {
       const [activeTaskToEdit, setActiveTaskToEdit] = useState(null);
       const [editSlipForm, setEditSlipForm] = useState({ slipNo: '', piecesReceived: '', ratePerPc: '', paidAmount: '', status: 'Pending', notes: '' });
 
-      // Speech Recognition & Audio Microphone State
+      // Speech Recognition State
       const [isListening, setIsListening] = useState(false);
       const recognitionRef = useRef(null);
-
-      useEffect(() => {
-        if (dataSourceMode === 'mock') {
-          localStorage.setItem('st_tasks', JSON.stringify(tasks));
-          localStorage.setItem('st_task_batches', JSON.stringify(taskProgressBatches));
-          localStorage.setItem('st_inventory', JSON.stringify(inventory));
-          localStorage.setItem('st_products', JSON.stringify(products));
-          localStorage.setItem('st_workers', JSON.stringify(workers));
-          localStorage.setItem('st_skills', JSON.stringify(workerSkills));
-          localStorage.setItem('st_rates', JSON.stringify(workerRates));
-          localStorage.setItem('st_users', JSON.stringify(users));
-        }
-        if (currentUser) {
-          localStorage.setItem('st_current_user', JSON.stringify(currentUser));
-        } else {
-          localStorage.removeItem('st_current_user');
-        }
-      }, [tasks, taskProgressBatches, inventory, products, workers, workerSkills, workerRates, users, currentUser, dataSourceMode]);
 
       // Natural Language Assistant & Test Drawer States
       const [nlQuery, setNlQuery] = useState('');
@@ -280,37 +168,39 @@ const handleWhisperVoiceInput = async () => {
       const [showTestTools, setShowTestTools] = useState(false);
       const [showJsonInspector, setShowJsonInspector] = useState(false);
 
-      // Task Filters (Scoped automatically if current user is a Worker)
+      // Heatmap Workload Filter State
+      const [heatmapFilter, setHeatmapFilter] = useState('All');
+
+      // Task Filters
       const [selectedWorker, setSelectedWorker] = useState('All');
       const [selectedStatus, setSelectedStatus] = useState('All');
       const [searchTerm, setSearchTerm] = useState('');
 
-      // If user is a worker, automatically lock selectedWorker to their worker name
+      // Lock worker filter if logged in as Worker
       useEffect(() => {
         if (currentUser && currentUser.role === 'Worker') {
           const wObj = workers.find(w => w.id === currentUser.worker_id);
           if (wObj) {
             setSelectedWorker(wObj.name);
           }
-          // Workers should default to tasks tab
           setActiveTab('tasks');
         }
       }, [currentUser, workers]);
 
       // Modal States
       const [isModalOpen, setIsModalOpen] = useState(false);
-      const [newTask, setNewTask] = useState({ slipNo: '', productId: 'PRD-01', workerId: 'WKR-01', piecesReceived: '', ratePerPc: '150', paidAmount: '', notes: '' });
+      const [newTask, setNewTask] = useState({ slipNo: '', productId: '', workerId: '', piecesReceived: '', ratePerPc: '150', paidAmount: '', notes: '' });
       const [materialSubSlip, setMaterialSubSlip] = useState([]);
-      const [currentMatInput, setCurrentMatInput] = useState({ materialId: 'RM-01', measureType: 'Length', qty: '' });
+      const [currentMatInput, setCurrentMatInput] = useState({ materialId: '', measureType: 'Length', qty: '' });
 
       const [isRestockModalOpen, setIsRestockModalOpen] = useState(false);
-      const [restockData, setRestockData] = useState({ materialId: 'RM-01', addQty: '' });
+      const [restockData, setRestockData] = useState({ materialId: '', addQty: '' });
 
       // Product Add/Edit Modal State
       const [isProductModalOpen, setIsProductModalOpen] = useState(false);
       const [productForm, setProductForm] = useState({ id: '', name: '', category: 'Traditional', clothLength: '6 Mtr', clothType: 'Cotton', color: '', defaultRate: 150, mrp: 750, description: '' });
 
-      // Worker Add/Edit & Custom Rates Modal State
+      // Worker Add/Edit Modal State
       const [isWorkerModalOpen, setIsWorkerModalOpen] = useState(false);
       const [workerForm, setWorkerForm] = useState({ id: '', name: '', role: 'Artisan', phone: '', skillLevel: 'Master Artisan', monthlyCapacity: 75, selectedProductIds: [], customRatesMap: {} });
 
@@ -365,9 +255,9 @@ const handleWhisperVoiceInput = async () => {
         }
       };
 
-      // Fetch from Supabase
+      // Fetch from Supabase exclusively
       useEffect(() => {
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           async function fetchSupabaseData() {
             try {
               const [{ data: t }, { data: b }, { data: i }, { data: p }, { data: w }, { data: s }, { data: r }, { data: u }] = await Promise.all([
@@ -383,17 +273,33 @@ const handleWhisperVoiceInput = async () => {
 
               if (t) setTasks(t.map(item => ({ id: item.id, slipNo: item.slip_no, workerId: item.worker_id, workerName: item.worker_name, productId: item.product_id, date: item.date, description: item.description, piecesReceived: Number(item.pieces_received), ratePerPc: Number(item.rate_per_pc), totalAmount: Number(item.total_amount), paidAmount: Number(item.paid_amount), status: item.status, subSlipMaterials: item.sub_slip_materials || [], materialAllocated: item.material_allocated, notes: item.notes })));
               if (b) setTaskProgressBatches(b.map(item => ({ id: item.id, task_id: item.task_id, pieces_completed: Number(item.pieces_completed), created_at: item.created_at, notes: item.notes })));
-              if (i) setInventory(i.map(item => ({ id: item.id, name: item.name, unit: item.unit, stock: Number(item.stock), minAlert: Number(item.min_alert), category: item.category })));
-              if (p) setProducts(p.map(item => ({ id: item.id, name: item.name, category: item.category, clothLength: item.cloth_length, clothType: item.cloth_type, color: item.color, defaultRate: Number(item.standard_rate), mrp: Number(item.mrp), description: item.description })));
-              if (w) setWorkers(w.map(item => ({ id: item.id, name: item.name, role: item.role, phone: item.phone, skillLevel: item.skill_level, monthlyCapacity: Number(item.monthly_capacity || 75) })));
+              if (i) {
+                setInventory(i.map(item => ({ id: item.id, name: item.name, unit: item.unit, stock: Number(item.stock), minAlert: Number(item.min_alert), category: item.category })));
+                if (i.length > 0) {
+                  setCurrentMatInput(prev => ({ ...prev, materialId: i[0].id }));
+                  setRestockData(prev => ({ ...prev, materialId: i[0].id }));
+                }
+              }
+              if (p) {
+                setProducts(p.map(item => ({ id: item.id, name: item.name, category: item.category, clothLength: item.cloth_length, clothType: item.cloth_type, color: item.color, defaultRate: Number(item.standard_rate), mrp: Number(item.mrp), description: item.description })));
+                if (p.length > 0) {
+                  setNewTask(prev => ({ ...prev, productId: p[0].id, ratePerPc: p[0].standard_rate || 150 }));
+                }
+              }
+              if (w) {
+                setWorkers(w.map(item => ({ id: item.id, name: item.name, role: item.role, phone: item.phone, skillLevel: item.skill_level, monthlyCapacity: Number(item.monthly_capacity || 75) })));
+                if (w.length > 0) {
+                  setNewTask(prev => ({ ...prev, workerId: w[0].id }));
+                }
+              }
               if (s) setWorkerSkills(s);
               if (r) setWorkerRates(r);
-              if (u && u.length > 0) setUsers(u);
+              if (u) setUsers(u);
             } catch (err) { console.error('Error fetching Supabase:', err); }
           }
           fetchSupabaseData();
         }
-      }, [dataSourceMode]);
+      }, []);
 
       // LOGIN HANDLER
       const handleLoginSubmit = async (e) => {
@@ -405,7 +311,7 @@ const handleWhisperVoiceInput = async () => {
         const hashedInput = await hashPassword(pwd);
         let foundUser = null;
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           try {
             const { data } = await supabase.from('users').select('*');
             if (data && data.length > 0) {
@@ -441,7 +347,6 @@ const handleWhisperVoiceInput = async () => {
 
       const handleLogout = () => {
         setCurrentUser(null);
-        localStorage.removeItem('st_current_user');
       };
 
       // PRODUCT CRUD HANDLERS
@@ -459,7 +364,7 @@ const handleWhisperVoiceInput = async () => {
         e.preventDefault();
         const exists = products.find(p => p.id === productForm.id);
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           const payload = { id: productForm.id, name: productForm.name, category: productForm.category, cloth_length: productForm.clothLength, cloth_type: productForm.clothType, color: productForm.color, standard_rate: Number(productForm.defaultRate), mrp: Number(productForm.mrp), description: productForm.description };
           if (exists) await supabase.from('products').update(payload).eq('id', productForm.id);
           else await supabase.from('products').insert([payload]);
@@ -479,7 +384,7 @@ const handleWhisperVoiceInput = async () => {
           title: `Delete Product Master "${prod?.name}"?`,
           message: `Are you sure you want to delete ${prod?.id}? This will clean up associated worker skills and custom negotiated rates.`,
           onConfirm: async () => {
-            if (dataSourceMode === 'database' && supabase) {
+            if (supabase) {
               await supabase.from('products').delete().eq('id', prodId);
             }
             setProducts(products.filter(p => p.id !== prodId));
@@ -508,7 +413,7 @@ const handleWhisperVoiceInput = async () => {
         e.preventDefault();
         const exists = workers.find(w => w.id === workerForm.id);
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           const payload = { id: workerForm.id, name: workerForm.name, role: workerForm.role, phone: workerForm.phone, skill_level: workerForm.skillLevel, monthly_capacity: Number(workerForm.monthlyCapacity || 75) };
           if (exists) await supabase.from('workers').update(payload).eq('id', workerForm.id);
           else await supabase.from('workers').insert([payload]);
@@ -550,7 +455,7 @@ const handleWhisperVoiceInput = async () => {
           title: `Delete Worker "${wrk?.name}"?`,
           message: `Are you sure you want to delete ${wrk?.id}? This will remove all mapped skills and custom negotiated rates for this artisan.`,
           onConfirm: async () => {
-            if (dataSourceMode === 'database' && supabase) {
+            if (supabase) {
               await supabase.from('workers').delete().eq('id', wrkId);
             }
             setWorkers(workers.filter(w => w.id !== wrkId));
@@ -587,7 +492,7 @@ const handleWhisperVoiceInput = async () => {
         setNewTask({ ...newTask, workerId: wrkId, ratePerPc: resolvedRate });
       };
 
-      // COMPUTE DYNAMIC TASK COMPLETED PIECES FROM BATCHES (IMMUTABLE BASELINE MODEL)
+      // COMPUTE DYNAMIC TASK COMPLETED PIECES FROM BATCHES
       const getTaskCompletedPieces = (taskId) => {
         return taskProgressBatches
           .filter(b => String(b.task_id) === String(taskId))
@@ -656,6 +561,19 @@ const handleWhisperVoiceInput = async () => {
         return Object.values(summaryMap);
       }, [workers, tasks, taskProgressBatches]);
 
+      // Filtered Artisan Summary for Heatmap based on heatmapFilter
+      const filteredWorkerSummary = useMemo(() => {
+        if (heatmapFilter === 'All') return workerSummary;
+        return workerSummary.filter(summary => {
+          const capacity = summary.monthlyCapacity || 75;
+          const loadPct = Math.min(100, Math.round((summary.totalTargetPieces / capacity) * 100));
+          if (heatmapFilter === 'Free') return loadPct < 50;
+          if (heatmapFilter === 'Loaded') return loadPct >= 50 && loadPct <= 85;
+          if (heatmapFilter === 'Busy') return loadPct > 85;
+          return true;
+        });
+      }, [workerSummary, heatmapFilter]);
+
       // Work-In-Progress (WIP) Analytics per Product Master Item
       const wipProductSummary = useMemo(() => {
         const wipMap = {};
@@ -671,74 +589,254 @@ const handleWhisperVoiceInput = async () => {
         return Object.values(wipMap);
       }, [products, tasks, taskProgressBatches]);
 
+      // --- TIER 1: FUSE.JS LOCAL FUZZY SEARCH INSTANCES FOR MASTERS ---
+      const workerFuse = useMemo(() => {
+        if (!window.Fuse) return null;
+        return new window.Fuse(workers, {
+          keys: ['name', 'id', 'role', 'skillLevel'],
+          threshold: 0.4,
+          includeScore: true
+        });
+      }, [workers]);
 
+      const productFuse = useMemo(() => {
+        if (!window.Fuse) return null;
+        return new window.Fuse(products, {
+          keys: ['name', 'id', 'category', 'description'],
+          threshold: 0.4,
+          includeScore: true
+        });
+      }, [products]);
 
+      const stockFuse = useMemo(() => {
+        if (!window.Fuse) return null;
+        return new window.Fuse(inventory, {
+          keys: ['name', 'id', 'category'],
+          threshold: 0.4,
+          includeScore: true
+        });
+      }, [inventory]);
 
-
-      // EXPANDED NATURAL LANGUAGE AI ASSISTANT & TOOLS
-      const handleNlQuerySubmit = (queryText) => {
+      // --- HYBRID LOCAL-FIRST FUZZY + LLM FALLBACK ROUTER ---
+      const handleNlQuerySubmit = async (queryText) => {
         const q = (queryText || nlQuery).toLowerCase().trim();
         if (!q) return;
 
-        setActiveTab('tasks');
         let matchedResult = { text: '', type: 'info' };
 
-        // 1. Tool: Check Worker Progress Tool
-        if (q.includes('check progress') || q.includes('worker progress') || q.includes('progress from')) {
-          const matchedWorker = workers.find(w => q.includes(w.name.toLowerCase().split(' ')[0]));
-          if (matchedWorker) {
-            const summary = workerSummary.find(ws => ws.id === matchedWorker.id);
-            if (summary) {
+        // TIER 1A: Quick Static Heuristic Shortcuts
+        if (q.includes('busy') || q.includes('overloaded')) {
+          setHeatmapFilter('Busy');
+          if (currentUser?.role === 'Admin') setActiveTab('summary');
+          matchedResult = { text: 'Local Router: Navigated to Analytics & filtered heatmap for Busy (>85%) artisans.', type: 'success' };
+          setNlResponse(matchedResult);
+          return;
+        }
+        if (q.includes('free') || q.includes('available')) {
+          setHeatmapFilter('Free');
+          if (currentUser?.role === 'Admin') setActiveTab('summary');
+          matchedResult = { text: 'Local Router: Navigated to Analytics & filtered heatmap for Available (<50%) artisans.', type: 'success' };
+          setNlResponse(matchedResult);
+          return;
+        }
+        if (q.includes('pending') || q.includes('unpaid')) {
+          setActiveTab('tasks');
+          setSelectedStatus('Pending');
+          if (currentUser?.role === 'Admin') setSelectedWorker('All');
+          matchedResult = { text: 'Local Router: Filtered task ledger to show all Pending / Unpaid work orders.', type: 'success' };
+          setNlResponse(matchedResult);
+          return;
+        }
+        if (q.includes('low stock') || q.includes('alert')) {
+          if (currentUser?.role === 'Admin') setActiveTab('inventory');
+          matchedResult = { text: 'Local Router: Navigated to Raw Material Inventory showing stock alerts.', type: 'warning' };
+          setNlResponse(matchedResult);
+          return;
+        }
+
+        // TIER 1B: Fuse.js Local Fuzzy Matcher across Workers, Products, and Stock Masters
+        if (workerFuse || productFuse || stockFuse) {
+          const workerMatches = workerFuse ? workerFuse.search(q) : [];
+          const productMatches = productFuse ? productFuse.search(q) : [];
+          const stockMatches = stockFuse ? stockFuse.search(q) : [];
+
+          // Rank top candidate across all 3 master collections
+          let topCandidate = null;
+          let bestScore = 1.0;
+
+          if (workerMatches.length > 0 && workerMatches[0].score < bestScore) {
+            bestScore = workerMatches[0].score;
+            topCandidate = { type: 'worker', item: workerMatches[0].item };
+          }
+          if (productMatches.length > 0 && productMatches[0].score < bestScore) {
+            bestScore = productMatches[0].score;
+            topCandidate = { type: 'product', item: productMatches[0].item };
+          }
+          if (stockMatches.length > 0 && stockMatches[0].score < bestScore) {
+            bestScore = stockMatches[0].score;
+            topCandidate = { type: 'stock', item: stockMatches[0].item };
+          }
+
+          // If a high-confidence local fuzzy match was found (threshold < 0.38)
+          if (topCandidate && bestScore < 0.38) {
+            if (topCandidate.type === 'worker') {
+              setActiveTab('tasks');
+              if (currentUser?.role === 'Admin') setSelectedWorker(topCandidate.item.name);
+              setSelectedStatus('All');
               matchedResult = {
-                text: `Tool Result [check_worker_progress]: ${summary.name} has completed ${summary.totalCompletedPieces}/${summary.totalTargetPieces} pieces across ${summary.totalTasks} tasks. Pending payout balance: ₹${summary.balance}.`,
+                text: `Fuse.js Local Fuzzy Match [Worker Master]: Resolved query to "${topCandidate.item.name}" (${topCandidate.item.id}). Filtered task ledger.`,
                 type: 'success'
               };
-              if (currentUser?.role === 'Admin') setSelectedWorker(summary.name);
-              return setNlResponse(matchedResult);
+            } else if (topCandidate.type === 'product') {
+              if (currentUser?.role === 'Admin') {
+                setActiveTab('catalog');
+                setMasterViewMode('grid');
+              } else {
+                setActiveTab('tasks');
+              }
+              setSearchTerm(topCandidate.item.name);
+              matchedResult = {
+                text: `Fuse.js Local Fuzzy Match [Product Master]: Resolved query to "${topCandidate.item.name}" (${topCandidate.item.id}).`,
+                type: 'success'
+              };
+            } else if (topCandidate.type === 'stock') {
+              if (currentUser?.role === 'Admin') setActiveTab('inventory');
+              matchedResult = {
+                text: `Fuse.js Local Fuzzy Match [Stock Master]: Resolved query to "${topCandidate.item.name}" (${topCandidate.item.id}) - Current Stock: ${topCandidate.item.stock} ${topCandidate.item.unit}.`,
+                type: 'warning'
+              };
             }
+            setNlResponse(matchedResult);
+            return;
           }
         }
 
-        // 2. Tool: Check Stock Tool
-        if (q.includes('check stock') || q.includes('stock level') || q.includes('inventory of')) {
-          const matchedItem = inventory.find(i => q.includes(i.name.toLowerCase().split(' ')[0]) || q.includes(i.id.toLowerCase()));
-          if (matchedItem) {
-            matchedResult = {
-              text: `Tool Result [check_stock]: "${matchedItem.name}" stock is ${matchedItem.stock} ${matchedItem.unit} (Min Alert: ${matchedItem.minAlert} ${matchedItem.unit}). Status: ${matchedItem.stock <= matchedItem.minAlert ? '⚠️ LOW STOCK ALERT' : '✅ Healthy'}.`,
-              type: matchedItem.stock <= matchedItem.minAlert ? 'warning' : 'success'
-            };
-            if (currentUser?.role === 'Admin') setActiveTab('inventory');
-            return setNlResponse(matchedResult);
+        // TIER 2: LLM Fallback (With Full Masters Payload Context for Workers, Products & Stock)
+        if (OPENAI_API_KEY && OPENAI_API_KEY !== 'YOUR_OPENAI_API_KEY_HERE') {
+          setNlQuery('Analyzing query with AI...');
+          try {
+            const systemPrompt = `You are an AI assistant for Sahi Taj ERP, a Pagdi manufacturing portal. Users will type or speak in Hindi, English, or Hinglish (e.g. "Ramash kya kar rahe hai", "Kesaria pagdi ka kitna stock hai"), often with heavy typos or phonetic misspellings.
+
+            You are provided with complete master data across all 3 domains:
+            
+            WORKERS MASTER:
+            ${JSON.stringify(workers.map(w => ({ id: w.id, name: w.name, role: w.role, skillLevel: w.skillLevel, capacity: w.monthlyCapacity })))}
+
+            PRODUCTS MASTER:
+            ${JSON.stringify(products.map(p => ({ id: p.id, name: p.name, category: p.category, rate: p.defaultRate, mrp: p.mrp })))}
+
+            RAW MATERIAL STOCK MASTER:
+            ${JSON.stringify(inventory.map(i => ({ id: i.id, name: i.name, category: i.category, stock: i.stock, unit: i.unit, minAlert: i.minAlert })))}
+
+            Note on Slip Numbers: Work order slip numbers follow a specific format (letters followed by numbers like A345, B208).
+
+            Analyze the user's query and map it to the most relevant master item or action.
+            Return ONLY a valid JSON object with this exact schema:
+            {
+              "intent": "view_worker_master" | "view_product_master" | "view_stock_master" | "get_slip_worker" | "get_available_workers" | "get_busy_workers" | "general_search",
+              "matched_master": "worker" | "product" | "stock" | "none",
+              "resolved_id": "string or null",
+              "resolved_name": "string or null",
+              "explanation": "short friendly description in English/Hinglish explaining which master item was identified and why"
+            }`;
+
+            const response = await fetch('https://api.openai.com/v1/chat/completions', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${OPENAI_API_KEY}`,
+                'Content-Type': 'application/json'
+              },
+              body: JSON.stringify({
+                model: 'gpt-4o-mini',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: q }
+                ],
+                temperature: 0.1,
+                response_format: { type: "json_object" }
+              })
+            });
+
+            const data = await response.json();
+            if (data.choices && data.choices[0]?.message?.content) {
+              const parsed = JSON.parse(data.choices[0].message.content);
+              
+              if (parsed.matched_master === 'worker' && parsed.resolved_name) {
+                setActiveTab('tasks');
+                if (currentUser?.role === 'Admin') setSelectedWorker(parsed.resolved_name);
+                setSelectedStatus('All');
+                matchedResult = {
+                  text: `AI LLM Master Resolver [Worker Master]: Linked query to "${parsed.resolved_name}". ${parsed.explanation}`,
+                  type: 'success'
+                };
+              } else if (parsed.matched_master === 'product' && parsed.resolved_name) {
+                if (currentUser?.role === 'Admin') {
+                  setActiveTab('catalog');
+                } else {
+                  setActiveTab('tasks');
+                }
+                setSearchTerm(parsed.resolved_name);
+                matchedResult = {
+                  text: `AI LLM Master Resolver [Product Master]: Linked query to product "${parsed.resolved_name}". ${parsed.explanation}`,
+                  type: 'success'
+                };
+              } else if (parsed.matched_master === 'stock' && parsed.resolved_name) {
+                if (currentUser?.role === 'Admin') setActiveTab('inventory');
+                matchedResult = {
+                  text: `AI LLM Master Resolver [Stock Master]: Linked query to raw material item "${parsed.resolved_name}". ${parsed.explanation}`,
+                  type: 'warning'
+                };
+              } else if (parsed.intent === 'get_slip_worker' && parsed.resolved_name) {
+                setActiveTab('tasks');
+                setSearchTerm(parsed.resolved_name);
+                matchedResult = {
+                  text: `AI LLM Intent: Filtered task ledger for Slip "${parsed.resolved_name}". ${parsed.explanation}`,
+                  type: 'success'
+                };
+              } else if (parsed.intent === 'get_available_workers') {
+                setHeatmapFilter('Free');
+                if (currentUser?.role === 'Admin') setActiveTab('summary');
+                matchedResult = {
+                  text: `AI LLM Intent: Filtered heatmap for available artisans. ${parsed.explanation || ''}`,
+                  type: 'success'
+                };
+              } else if (parsed.intent === 'get_busy_workers') {
+                setHeatmapFilter('Busy');
+                if (currentUser?.role === 'Admin') setActiveTab('summary');
+                matchedResult = {
+                  text: `AI LLM Intent: Filtered heatmap for busy artisans. ${parsed.explanation || ''}`,
+                  type: 'success'
+                };
+              } else {
+                setActiveTab('tasks');
+                setSearchTerm(q);
+                matchedResult = {
+                  text: `AI Assistant: ${parsed.explanation || `Searched catalog for "${q}".`}`,
+                  type: 'success'
+                };
+              }
+              setNlQuery(q);
+              setNlResponse(matchedResult);
+              return;
+            }
+          } catch (err) {
+            console.error('LLM Assistant Error, falling back to search:', err);
           }
         }
 
-        // Standard Filter Interpretations
-        if (q.includes('pending') || q.includes('unpaid')) {
-          setSelectedStatus('Pending'); if (currentUser?.role === 'Admin') setSelectedWorker('All');
-          matchedResult = { text: 'Filtered task ledger to show all Pending / Unpaid work orders.', type: 'success' };
-        } else if (q.includes('surendra')) {
-          if (currentUser?.role === 'Admin') setSelectedWorker('Surendra Ji'); 
-          setSelectedStatus('All');
-          matchedResult = { text: 'Filtered task ledger for artisan Surendra Ji.', type: 'success' };
-        } else if (q.includes('ramesh')) {
-          if (currentUser?.role === 'Admin') setSelectedWorker('Ramesh Ji'); 
-          setSelectedStatus('All');
-          matchedResult = { text: 'Filtered task ledger for artisan Ramesh Ji.', type: 'success' };
-        } else if (q.includes('low stock') || q.includes('alert')) {
-          if (currentUser?.role === 'Admin') setActiveTab('inventory');
-          matchedResult = { text: 'Navigated to Raw Material Inventory. Showing active stock alert items.', type: 'warning' };
-        } else {
-          setSearchTerm(q);
-          matchedResult = { text: `Searched work orders and catalog for "${q}".`, type: 'success' };
-        }
+        // Final General Fallback
+        setActiveTab('tasks');
+        setSearchTerm(q);
+        matchedResult = { text: `Searched work orders and catalog for "${q}".`, type: 'success' };
         setNlResponse(matchedResult);
       };
 
-
-
-
       // Simulation Test Tools Handlers
       const handleSimulateRandomOrder = () => {
+        if (workers.length === 0 || products.length === 0) {
+          alert('Please add at least one product and one worker first.');
+          return;
+        }
         const randomSlips = ['A199', 'B208', 'C401', 'X902'];
         const randomSlip = randomSlips[Math.floor(Math.random() * randomSlips.length)];
         const randomWorker = workers[Math.floor(Math.random() * workers.length)];
@@ -749,8 +847,8 @@ const handleWhisperVoiceInput = async () => {
         const simulatedTask = {
           id: `TSK-${Date.now()}`, slipNo: randomSlip, workerId: randomWorker.id, workerName: randomWorker.name, productId: randomProd.id, date: new Date().toISOString().split('T')[0],
           description: randomProd.name, piecesReceived: randomPieces, ratePerPc: randomProd.defaultRate, totalAmount: total, paidAmount: 0, status: 'Pending',
-          subSlipMaterials: [{ id: randomProd.reqMaterialId, name: 'Allocated Fabric Material', qty: randomPieces * randomProd.reqQtyPerPc, unit: 'Meters', type: 'Length' }],
-          materialAllocated: `Auto-allocated fabric (${randomPieces * randomProd.reqQtyPerPc} Mtr)`, notes: 'Simulated via Test Tool Sandbox'
+          subSlipMaterials: [],
+          materialAllocated: 'Simulated Order Material', notes: 'Simulated via Test Tool Sandbox'
         };
 
         setTasks([simulatedTask, ...tasks]);
@@ -758,32 +856,16 @@ const handleWhisperVoiceInput = async () => {
       };
 
       const handleTriggerLowStock = () => {
-        setInventory(prev => prev.map(item => {
-          if (item.id === 'RM-07') return { ...item, stock: 10 };
+        if (inventory.length === 0) {
+          alert('Inventory is currently empty.');
+          return;
+        }
+        setInventory(prev => prev.map((item, index) => {
+          if (index === 0) return { ...item, stock: 10 };
           return item;
         }));
         if (currentUser?.role === 'Admin') setActiveTab('inventory');
-        setNlResponse({ text: 'Test tool forced Gold Brocade Tissue Fabric stock down to 10 Meters (Triggered Low Stock Alert).', type: 'warning' });
-      };
-
-      const handleResetLocalState = () => {
-        localStorage.removeItem('st_tasks');
-        localStorage.removeItem('st_task_batches');
-        localStorage.removeItem('st_inventory');
-        localStorage.removeItem('st_products');
-        localStorage.removeItem('st_workers');
-        localStorage.removeItem('st_skills');
-        localStorage.removeItem('st_rates');
-        localStorage.removeItem('st_users');
-        setTasks(INITIAL_TASKS);
-        setTaskProgressBatches(INITIAL_PROGRESS_BATCHES);
-        setInventory(INITIAL_INVENTORY);
-        setProducts(INITIAL_PRODUCTS);
-        setWorkers(INITIAL_WORKERS);
-        setWorkerSkills(INITIAL_WORKER_SKILLS);
-        setWorkerRates(INITIAL_WORKER_RATES);
-        setUsers(INITIAL_USERS);
-        setNlResponse({ text: 'Reset application memory back to factory default mock state.', type: 'info' });
+        setNlResponse({ text: `Test tool forced ${inventory[0]?.name || 'Item'} stock down to 10 (Triggered Low Stock Alert).`, type: 'warning' });
       };
 
       // Material Sub-Slip Itemizer Handlers
@@ -816,7 +898,7 @@ const handleWhisperVoiceInput = async () => {
           });
           setInventory(updatedInventoryList);
 
-          if (dataSourceMode === 'database' && supabase) {
+          if (supabase) {
             for (const sub of materialSubSlip) {
               const currentItem = inventory.find(i => i.id === sub.id);
               const updatedStock = Math.max(0, (currentItem ? currentItem.stock : 0) - sub.qty);
@@ -829,13 +911,13 @@ const handleWhisperVoiceInput = async () => {
         }
 
         const createdTask = {
-          id: `TSK-${Date.now()}`, slipNo: newTask.slipNo.toUpperCase(), workerId: newTask.workerId, workerName: wrkObj ? wrkObj.name : 'Surendra Ji',
-          productId: newTask.productId, date: new Date().toISOString().split('T')[0], description: prodObj ? prodObj.name : 'Custom Pagdi',
+          id: `TSK-${Date.now()}`, slipNo: newTask.slipNo.toUpperCase(), workerId: newTask.workerId, workerName: wrkObj ? wrkObj.name : 'Unassigned',
+          productId: newTask.productId, date: new Date().toISOString().split('T')[0], description: prodObj ? prodObj.name : 'Custom Order',
           piecesReceived: pieces, ratePerPc: rate, totalAmount: total, paidAmount: paid, status: paid >= total ? 'Paid' : paid > 0 ? 'Partial' : 'Pending',
           subSlipMaterials: materialSubSlip, materialAllocated: materialSubSlip.map(m => `${m.name} (${m.qty} ${m.unit})`).join(', '), notes: newTask.notes || 'Work order'
         };
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           await supabase.from('tasks').insert([{ id: createdTask.id, slip_no: createdTask.slipNo, worker_id: createdTask.workerId, worker_name: createdTask.workerName, product_id: createdTask.productId, date: createdTask.date, description: createdTask.description, pieces_received: createdTask.piecesReceived, rate_per_pc: createdTask.ratePerPc, total_amount: createdTask.totalAmount, paid_amount: createdTask.paidAmount, status: createdTask.status, sub_slip_materials: createdTask.subSlipMaterials, material_allocated: createdTask.materialAllocated, notes: createdTask.notes }]);
         }
 
@@ -852,7 +934,7 @@ const handleWhisperVoiceInput = async () => {
         const targetItem = inventory.find(i => i.id === restockData.materialId);
         const newStock = (targetItem ? targetItem.stock : 0) + qtyToAdd;
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           const { error } = await supabase
             .from('inventory')
             .update({ stock: newStock })
@@ -865,17 +947,17 @@ const handleWhisperVoiceInput = async () => {
 
         setInventory(inventory.map(item => item.id === restockData.materialId ? { ...item, stock: newStock } : item));
         setIsRestockModalOpen(false);
-        setRestockData({ materialId: 'RM-01', addQty: '' });
+        setRestockData({ materialId: inventory[0]?.id || '', addQty: '' });
       };
 
-      // WORK SLIP LIFECYCLE: Open Progress Update Modal (Logs Work Chunks without altering baseline order size)
+      // Open Progress Update Modal
       const handleOpenProgressModal = (task) => {
         setActiveTaskToUpdate(task);
         setProgressUpdateForm({ piecesChunk: '', newStatus: task.status === 'Pending' ? 'In Progress' : task.status, paidIncrement: '', notes: '' });
         setIsProgressModalOpen(true);
       };
 
-      // WORK SLIP LIFECYCLE: Submit Work Chunk Progress Batch
+      // Submit Work Chunk Progress Batch
       const handleProgressSubmit = async (e) => {
         e.preventDefault();
         if (!activeTaskToUpdate) return;
@@ -885,7 +967,6 @@ const handleWhisperVoiceInput = async () => {
         const newTotalPaid = Number(activeTaskToUpdate.paidAmount || 0) + incPaid;
         const finalStatus = progressUpdateForm.newStatus;
 
-        // Create discrete chunk entry in task_progress_batches
         const newBatchObj = {
           id: Date.now(),
           task_id: activeTaskToUpdate.id,
@@ -894,7 +975,7 @@ const handleWhisperVoiceInput = async () => {
           notes: progressUpdateForm.notes || 'Worker progress chunk'
         };
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           if (newChunkPieces > 0) {
             await supabase.from('task_progress_batches').insert([{
               task_id: activeTaskToUpdate.id,
@@ -962,7 +1043,7 @@ const handleWhisperVoiceInput = async () => {
           notes: editSlipForm.notes
         };
 
-        if (dataSourceMode === 'database' && supabase) {
+        if (supabase) {
           await supabase.from('tasks').update({
             slip_no: updatedTask.slipNo,
             pieces_received: newPieces,
@@ -993,8 +1074,15 @@ const handleWhisperVoiceInput = async () => {
                 </h1>
                 <p className="text-xs text-slate-500 mt-1">ERP & Master Management System</p>
               </div>
-
-              <form onSubmit={handleLoginSubmit} className="space-y-4">
+              <div className="mt-6 pt-4 border-t text-center">
+                <span className="text-xs text-slate-400 block font-medium">Quick Demo Credentials:</span>
+                <div className="flex flex-wrap justify-center gap-1.5 mt-2">
+                  <button type="button" onClick={() => setLoginForm({ username: 'admin', password: 'SahiTaj2026!' })} className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded font-semibold">Admin</button>
+                  <button type="button" onClick={() => setLoginForm({ username: 'surendra', password: 'SahiTaj2026!' })} className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Surendra (WKR-01)</button>
+                  <button type="button" onClick={() => setLoginForm({ username: 'ramesh', password: 'SahiTaj2026!' })} className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Ramesh (WKR-02)</button>
+                </div>
+              </div>
+              <form onSubmit={handleLoginSubmit} className="space-y-4 mt-4">
                 {loginError && (
                   <div className="p-3 bg-rose-50 border border-rose-200 text-rose-700 text-xs rounded-xl font-medium">
                     {loginError}
@@ -1005,7 +1093,7 @@ const handleWhisperVoiceInput = async () => {
                   <input
                     type="text"
                     required
-                    placeholder="e.g. admin or surendra"
+                    placeholder="Enter your username"
                     value={loginForm.username}
                     onChange={(e) => setLoginForm({ ...loginForm, username: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 rounded-xl border text-sm focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
@@ -1021,7 +1109,7 @@ const handleWhisperVoiceInput = async () => {
                     onChange={(e) => setLoginForm({ ...loginForm, password: e.target.value })}
                     className="w-full px-4 py-3 bg-slate-50 rounded-xl border text-sm focus:ring-2 focus:ring-amber-500/40 focus:outline-none"
                   />
-                  <span className="text-[10px] text-slate-400 mt-1 block">Default password for all accounts: SahiTaj2026!</span>
+				  <span className="text-[10px] text-slate-400 mt-1 block">Default password for all accounts: SahiTaj2026!</span>
                 </div>
 
                 <button
@@ -1031,15 +1119,6 @@ const handleWhisperVoiceInput = async () => {
                   Sign In to Sahi Taj
                 </button>
               </form>
-
-              <div className="mt-6 pt-4 border-t text-center">
-                <span className="text-xs text-slate-400 block font-medium">Quick Demo Credentials:</span>
-                <div className="flex flex-wrap justify-center gap-1.5 mt-2">
-                  <button onClick={() => setLoginForm({ username: 'admin', password: 'SahiTaj2026!' })} className="text-[11px] bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-1 rounded font-semibold">Admin</button>
-                  <button onClick={() => setLoginForm({ username: 'surendra', password: 'SahiTaj2026!' })} className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Surendra (WKR-01)</button>
-                  <button onClick={() => setLoginForm({ username: 'ramesh', password: 'SahiTaj2026!' })} className="text-[11px] bg-amber-50 hover:bg-amber-100 text-amber-800 px-2 py-1 rounded font-semibold">Ramesh (WKR-02)</button>
-                </div>
-              </div>
             </div>
           </div>
         );
@@ -1165,47 +1244,48 @@ const handleWhisperVoiceInput = async () => {
               <div className="flex items-center justify-between mb-2">
                 <div className="flex items-center space-x-2">
                   <div className="bg-amber-500/20 p-1.5 rounded-lg text-amber-300"><i data-lucide="sparkles" className="w-4 h-4"></i></div>
-                  <h3 className="text-sm font-bold text-amber-100 uppercase tracking-wider">Sahi Taj Natural Language Assistant & Tools</h3>
+                  <h3 className="text-sm font-bold text-amber-100 uppercase tracking-wider">Sahi Taj Natural Language Assistant & Masters AI Resolver</h3>
                 </div>
-                {OPENAI_API_KEY && (
-                  <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full font-mono">
-                    OpenAI Key Loaded
+                <div className="flex items-center space-x-1.5">
+                  <span className="bg-amber-500/20 text-amber-300 border border-amber-500/40 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                    Fuse.js Fuzzy Engine Active
                   </span>
-                )}
+                  {OPENAI_API_KEY && (
+                    <span className="bg-emerald-500/20 text-emerald-300 border border-emerald-500/40 text-[10px] px-2 py-0.5 rounded-full font-mono">
+                      OpenAI Key Loaded
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="text-xs text-amber-200/80 mb-3">
-                Type or speak using the mic (e.g. <span className="underline italic">"Check progress from Surendra"</span>, <span className="underline italic">"Check stock Cotton Base"</span>)
+                Type or speak across Workers, Products & Raw Material Masters (e.g. <span className="underline italic">"Ramsh ko kitne slip diye"</span>, <span className="underline italic">"Kesaria silk kitna hai"</span>, <span className="underline italic">"Abhi kon free hai"</span>)
               </p>
               <form onSubmit={(e) => { e.preventDefault(); handleNlQuerySubmit(); }} className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <i data-lucide="search" className="w-4 h-4 absolute left-3.5 top-3.5 text-slate-400"></i>
                   <input
                     type="text"
-                    placeholder="Ask or speak: e.g., 'Check progress Surendra', 'Check stock Silk', 'Show pending'..."
+                    placeholder="Search or ask: e.g., 'Ramsh kya kar raha hai', 'Kesria silk stock', 'Abhi kon busy hai'..."
                     value={nlQuery}
                     onChange={(e) => setNlQuery(e.target.value)}
                     className="w-full pl-10 pr-12 py-2.5 bg-slate-900/90 rounded-xl border border-amber-600/50 text-sm text-white focus:outline-none focus:ring-2 focus:ring-amber-400"
                   />
-				  
-{/* Microphone Button Triggering Whisper */}
-    <button
-      type="button"
-      onClick={handleWhisperVoiceInput}
-      className="absolute right-3 top-2.5 text-amber-400 hover:text-amber-300 transition p-1"
-      title="Speak in Marwari / Hindi using Whisper AI"
-    >
-      <i data-lucide="mic" className="w-4 h-4"></i>
-    </button>
-                 
-				  
-				  
+                  
+                  <button
+                    type="button"
+                    onClick={handleWhisperVoiceInput}
+                    className="absolute right-3 top-2.5 text-amber-400 hover:text-amber-300 transition p-1"
+                    title="Speak in Marwari / Hindi using Whisper AI"
+                  >
+                    <i data-lucide="mic" className="w-4 h-4"></i>
+                  </button>
                 </div>
                 <button type="submit" className="bg-amber-500 hover:bg-amber-400 text-amber-950 font-bold px-5 py-2.5 rounded-xl text-sm transition whitespace-nowrap">Ask AI</button>
               </form>
 
               {nlResponse && (
                 <div className="mt-3 p-2.5 bg-amber-950/90 border border-amber-500/40 rounded-xl text-xs text-amber-100 flex items-center justify-between">
-                  <span><strong>Assistant Tool Executed:</strong> {nlResponse.text}</span>
+                  <span><strong>Assistant Resolver Executed:</strong> {nlResponse.text}</span>
                   <button onClick={() => setNlResponse(null)} className="text-amber-300 font-bold ml-2">✕</button>
                 </div>
               )}
@@ -1222,20 +1302,15 @@ const handleWhisperVoiceInput = async () => {
                   <button onClick={() => setShowTestTools(false)} className="text-slate-400 hover:text-slate-600 font-bold text-sm">Close ✕</button>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-4 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                   <button onClick={handleSimulateRandomOrder} className="p-3 bg-amber-50 hover:bg-amber-100 border border-amber-200 rounded-xl text-left transition">
                     <div className="font-bold text-amber-900 text-sm flex items-center"><i data-lucide="plus-circle" className="w-4 h-4 mr-1.5 text-amber-700"></i> Simulate Random Order</div>
-                    <p className="text-xs text-slate-600 mt-1">Injects a mock work order slip & auto-deducts material.</p>
+                    <p className="text-xs text-slate-600 mt-1">Injects a test work order slip into state.</p>
                   </button>
 
                   <button onClick={handleTriggerLowStock} className="p-3 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-xl text-left transition">
                     <div className="font-bold text-rose-900 text-sm flex items-center"><i data-lucide="alert-triangle" className="w-4 h-4 mr-1.5 text-rose-700"></i> Trigger Low Stock Test</div>
-                    <p className="text-xs text-slate-600 mt-1">Drops Tissue Fabric stock below min alert level.</p>
-                  </button>
-
-                  <button onClick={handleResetLocalState} className="p-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-left transition">
-                    <div className="font-bold text-slate-800 text-sm flex items-center"><i data-lucide="rotate-ccw" className="w-4 h-4 mr-1.5 text-slate-600"></i> Reset Factory State</div>
-                    <p className="text-xs text-slate-600 mt-1">Clears localStorage memory & restores base seeds.</p>
+                    <p className="text-xs text-slate-600 mt-1">Drops inventory stock below alert level.</p>
                   </button>
 
                   <button onClick={() => setShowJsonInspector(!showJsonInspector)} className="p-3 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-left transition">
@@ -1247,7 +1322,7 @@ const handleWhisperVoiceInput = async () => {
                 {showJsonInspector && (
                   <div className="mt-3 p-4 bg-slate-900 rounded-xl text-emerald-400 font-mono text-xs overflow-x-auto max-h-60 space-y-2">
                     <div className="flex justify-between items-center text-slate-400 border-b border-slate-800 pb-1">
-                      <span>Live State Payload (Including Batches)</span>
+                      <span>Live State Payload</span>
                       <span>Total Tasks: {tasks.length} | Batches: {taskProgressBatches.length}</span>
                     </div>
                     <pre>{JSON.stringify({ tasks, taskProgressBatches, inventory, products, workers, workerSkills, workerRates, users }, null, 2)}</pre>
@@ -1324,7 +1399,7 @@ const handleWhisperVoiceInput = async () => {
                       {currentUser.role === 'Admin' ? 'Work Orders & Raw Material Issue Ledger' : 'My Assigned Work Order Slips'}
                     </h3>
                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-100 text-emerald-800">
-                      ☁️ Cloud Sync Active
+                      ☁️ Supabase Cloud Database Connected
                     </span>
                   </div>
                   <div className="overflow-x-auto">
@@ -1442,22 +1517,26 @@ const handleWhisperVoiceInput = async () => {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-slate-100">
-                      {inventory.map(item => (
-                        <tr key={item.id} className="hover:bg-slate-50">
-                          <td className="py-3.5 px-4 font-mono text-slate-500">{item.id}</td>
-                          <td className="py-3.5 px-4 font-bold text-slate-900">{item.name}</td>
-                          <td className="py-3.5 px-4"><span className="bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 rounded-full">{item.category}</span></td>
-                          <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900">{item.stock.toLocaleString()} <span className="text-xs font-normal text-slate-500">{item.unit}</span></td>
-                          <td className="py-3.5 px-4 text-right text-slate-500">{item.minAlert} {item.unit}</td>
-                          <td className="py-3.5 px-4 text-center">
-                            {item.stock <= item.minAlert ? (
-                              <span className="bg-rose-100 text-rose-800 text-xs px-2.5 py-0.5 rounded-full font-bold">Low Stock</span>
-                            ) : (
-                              <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-semibold">Healthy Stock</span>
-                            )}
-                          </td>
-                        </tr>
-                      ))}
+                      {inventory.length === 0 ? (
+                        <tr><td colSpan="6" className="py-8 text-center text-slate-400">No inventory items found. Add items to track raw material stock.</td></tr>
+                      ) : (
+                        inventory.map(item => (
+                          <tr key={item.id} className="hover:bg-slate-50">
+                            <td className="py-3.5 px-4 font-mono text-slate-500">{item.id}</td>
+                            <td className="py-3.5 px-4 font-bold text-slate-900">{item.name}</td>
+                            <td className="py-3.5 px-4"><span className="bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 rounded-full">{item.category}</span></td>
+                            <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900">{item.stock.toLocaleString()} <span className="text-xs font-normal text-slate-500">{item.unit}</span></td>
+                            <td className="py-3.5 px-4 text-right text-slate-500">{item.minAlert} {item.unit}</td>
+                            <td className="py-3.5 px-4 text-center">
+                              {item.stock <= item.minAlert ? (
+                                <span className="bg-rose-100 text-rose-800 text-xs px-2.5 py-0.5 rounded-full font-bold">Low Stock</span>
+                              ) : (
+                                <span className="bg-emerald-100 text-emerald-800 text-xs px-2.5 py-0.5 rounded-full font-semibold">Healthy Stock</span>
+                              )}
+                            </td>
+                          </tr>
+                        ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1486,7 +1565,9 @@ const handleWhisperVoiceInput = async () => {
                     </div>
                   </div>
 
-                  {masterViewMode === 'grid' ? (
+                  {products.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400">No products configured. Click "+ Add Product Master" to get started.</div>
+                  ) : masterViewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mt-6">
                       {products.map(prod => (
                         <div key={prod.id} className="border rounded-xl p-4 bg-white relative hover:shadow-md transition">
@@ -1559,7 +1640,9 @@ const handleWhisperVoiceInput = async () => {
                     </div>
                   </div>
 
-                  {workerViewMode === 'grid' ? (
+                  {workers.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400">No artisans registered. Click "+ Register Worker" to add workers.</div>
+                  ) : workerViewMode === 'grid' ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
                       {workers.map(w => {
                         const assignedSkills = workerSkills.filter(s => s.worker_id === w.id);
@@ -1657,71 +1740,98 @@ const handleWhisperVoiceInput = async () => {
                 
                 {/* 1. Artisan Workload Heatmap Section */}
                 <div className="bg-white rounded-2xl p-6 shadow-sm border border-slate-200/80">
-                  <div className="pb-4 border-b border-slate-100 flex items-center justify-between">
+                  <div className="pb-4 border-b border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">Artisan Workload & Capacity Heatmap</h3>
                       <p className="text-xs text-slate-500">Real-time load balancing based on monthly capacity targets (Default: 75 pcs/month)</p>
                     </div>
-                    <div className="flex items-center space-x-3 text-xs font-bold">
-                      <span className="flex items-center text-emerald-700"><span className="w-2.5 h-2.5 rounded-full bg-emerald-500 mr-1.5"></span>Free (&lt;50%)</span>
-                      <span className="flex items-center text-amber-700"><span className="w-2.5 h-2.5 rounded-full bg-amber-500 mr-1.5"></span>Loaded (50-85%)</span>
-                      <span className="flex items-center text-rose-700"><span className="w-2.5 h-2.5 rounded-full bg-rose-500 mr-1.5"></span>Busy (&gt;85%)</span>
+                    <div className="flex flex-wrap items-center gap-2 text-xs font-bold">
+                      <button 
+                        onClick={() => setHeatmapFilter('All')} 
+                        className={`px-3 py-1.5 rounded-xl border transition ${heatmapFilter === 'All' ? 'bg-slate-900 text-white border-slate-900 shadow' : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'}`}
+                      >
+                        All ({workerSummary.length})
+                      </button>
+                      <button 
+                        onClick={() => setHeatmapFilter('Free')} 
+                        className={`px-3 py-1.5 rounded-xl border flex items-center transition ${heatmapFilter === 'Free' ? 'bg-emerald-600 text-white border-emerald-600 shadow' : 'bg-emerald-50 text-emerald-800 border-emerald-200 hover:bg-emerald-100'}`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-emerald-400 mr-1.5"></span>Free (&lt;50%)
+                      </button>
+                      <button 
+                        onClick={() => setHeatmapFilter('Loaded')} 
+                        className={`px-3 py-1.5 rounded-xl border flex items-center transition ${heatmapFilter === 'Loaded' ? 'bg-amber-500 text-amber-950 border-amber-500 shadow' : 'bg-amber-50 text-amber-800 border-amber-200 hover:bg-amber-100'}`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-amber-400 mr-1.5"></span>Loaded (50-85%)
+                      </button>
+                      <button 
+                        onClick={() => setHeatmapFilter('Busy')} 
+                        className={`px-3 py-1.5 rounded-xl border flex items-center transition ${heatmapFilter === 'Busy' ? 'bg-rose-600 text-white border-rose-600 shadow' : 'bg-rose-50 text-rose-800 border-rose-200 hover:bg-rose-100'}`}
+                      >
+                        <span className="w-2 h-2 rounded-full bg-rose-400 mr-1.5"></span>Busy (&gt;85%)
+                      </button>
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-                    {workerSummary.map(summary => {
-                      const capacity = summary.monthlyCapacity || 75;
-                      const loadPct = Math.min(100, Math.round((summary.totalCompletedPieces / capacity) * 100));
-                      const isBusy = loadPct > 85;
-                      const isLoaded = loadPct >= 50 && loadPct <= 85;
+                  {filteredWorkerSummary.length === 0 ? (
+                    <div className="py-8 text-center text-slate-400">
+                      No artisans found matching the active filter ("{heatmapFilter}").
+                      <button onClick={() => setHeatmapFilter('All')} className="ml-2 text-amber-600 underline font-bold">Show All Artisans</button>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                      {filteredWorkerSummary.map(summary => {
+                        const capacity = summary.monthlyCapacity || 75;
+                        const loadPct = Math.min(100, Math.round((summary.totalTargetPieces/ capacity) * 100));
+                        const isBusy = loadPct > 85;
+                        const isLoaded = loadPct >= 50 && loadPct <= 85;
 
-                      const statusColor = isBusy ? 'bg-rose-500 text-rose-900' : isLoaded ? 'bg-amber-500 text-amber-900' : 'bg-emerald-500 text-emerald-900';
-                      const badgeBg = isBusy ? 'bg-rose-100 text-rose-800 border-rose-200' : isLoaded ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200';
-                      const badgeLabel = isBusy ? 'BUSY / OVERLOADED' : isLoaded ? 'MODERATE LOAD' : 'AVAILABLE / FREE';
+                        const statusColor = isBusy ? 'bg-rose-500 text-rose-900' : isLoaded ? 'bg-amber-500 text-amber-900' : 'bg-emerald-500 text-emerald-900';
+                        const badgeBg = isBusy ? 'bg-rose-100 text-rose-800 border-rose-200' : isLoaded ? 'bg-amber-100 text-amber-800 border-amber-200' : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+                        const badgeLabel = isBusy ? 'BUSY / OVERLOADED' : isLoaded ? 'MODERATE LOAD' : 'AVAILABLE / FREE';
 
-                      return (
-                        <div key={summary.name} className="bg-slate-50 rounded-2xl p-5 border border-slate-200/90 relative hover:shadow-md transition">
-                          <div className="flex justify-between items-start">
-                            <div>
-                              <h4 className="font-bold text-slate-900 text-base">{summary.name}</h4>
-                              <p className="text-xs text-slate-500">{summary.role}</p>
+                        return (
+                          <div key={summary.name} className="bg-slate-50 rounded-2xl p-5 border border-slate-200/90 relative hover:shadow-md transition">
+                            <div className="flex justify-between items-start">
+                              <div>
+                                <h4 className="font-bold text-slate-900 text-base">{summary.name}</h4>
+                                <p className="text-xs text-slate-500">{summary.role}</p>
+                              </div>
+                              <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${badgeBg}`}>
+                                {badgeLabel}
+                              </span>
                             </div>
-                            <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${badgeBg}`}>
-                              {badgeLabel}
-                            </span>
+
+                            <div className="mt-4">
+                              <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
+                                <span>Monthly Workload (Done / Target)</span>
+                                <span>{summary.totalCompletedPieces} / {capacity} pcs ({loadPct}%)</span>
+                              </div>
+                              <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
+                                <div className={`h-full transition-all duration-500 ${statusColor}`} style={{ width: `${loadPct}%` }}></div>
+                              </div>
+                            </div>
+
+                            <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
+                              <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                <span className="text-slate-400 block text-[10px]">Work Orders Logged</span>
+                                <span className="font-extrabold text-slate-800 text-sm">{summary.totalTasks} Slips</span>
+                              </div>
+                              <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
+                                <span className="text-slate-400 block text-[10px]">Total Labor Earned</span>
+                                <span className="font-extrabold text-slate-800 text-sm">₹{summary.totalEarned.toLocaleString()}</span>
+                              </div>
+                            </div>
+
+                            <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-xs font-semibold">
+                              <span className="text-slate-500">Paid: ₹{summary.totalPaid.toLocaleString()}</span>
+                              <span className="text-rose-600">Pending: ₹{summary.balance.toLocaleString()}</span>
+                            </div>
                           </div>
-
-                          {/* Workload Progress Bar */}
-                          <div className="mt-4">
-                            <div className="flex justify-between text-xs font-bold text-slate-700 mb-1">
-                              <span>Monthly Workload (Done / Target)</span>
-                              <span>{summary.totalCompletedPieces} / {capacity} pcs ({loadPct}%)</span>
-                            </div>
-                            <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
-                              <div className={`h-full transition-all duration-500 ${statusColor}`} style={{ width: `${loadPct}%` }}></div>
-                            </div>
-                          </div>
-
-                          <div className="mt-4 grid grid-cols-2 gap-2 text-xs">
-                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
-                              <span className="text-slate-400 block text-[10px]">Work Orders Logged</span>
-                              <span className="font-extrabold text-slate-800 text-sm">{summary.totalTasks} Slips</span>
-                            </div>
-                            <div className="bg-white p-2.5 rounded-xl border border-slate-200/60">
-                              <span className="text-slate-400 block text-[10px]">Total Labor Earned</span>
-                              <span className="font-extrabold text-slate-800 text-sm">₹{summary.totalEarned.toLocaleString()}</span>
-                            </div>
-                          </div>
-
-                          <div className="mt-3 pt-3 border-t border-slate-200 flex justify-between text-xs font-semibold">
-                            <span className="text-slate-500">Paid: ₹{summary.totalPaid.toLocaleString()}</span>
-                            <span className="text-rose-600">Pending: ₹{summary.balance.toLocaleString()}</span>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
 
                 {/* 2. Work-In-Progress (WIP) Tracker per Master Item */}
@@ -1744,16 +1854,20 @@ const handleWhisperVoiceInput = async () => {
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-slate-100">
-                        {wipProductSummary.map(wip => (
-                          <tr key={wip.id} className="hover:bg-slate-50">
-                            <td className="py-3.5 px-4 font-mono font-bold text-amber-800">{wip.id}</td>
-                            <td className="py-3.5 px-4 font-bold text-slate-900">{wip.name}</td>
-                            <td className="py-3.5 px-4"><span className="bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 rounded-full">{wip.category}</span></td>
-                            <td className="py-3.5 px-4 text-center font-semibold text-slate-800">{wip.activeSlips} slips</td>
-                            <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900">{wip.totalCompletedPieces.toLocaleString()} / {wip.totalTargetPieces.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span></td>
-                            <td className="py-3.5 px-4 text-right font-bold text-emerald-600">₹{wip.grossValue.toLocaleString()}</td>
-                          </tr>
-                        ))}
+                        {wipProductSummary.length === 0 ? (
+                          <tr><td colSpan="6" className="py-8 text-center text-slate-400">No WIP data available.</td></tr>
+                        ) : (
+                          wipProductSummary.map(wip => (
+                            <tr key={wip.id} className="hover:bg-slate-50">
+                              <td className="py-3.5 px-4 font-mono font-bold text-amber-800">{wip.id}</td>
+                              <td className="py-3.5 px-4 font-bold text-slate-900">{wip.name}</td>
+                              <td className="py-3.5 px-4"><span className="bg-slate-100 text-slate-700 text-xs px-2.5 py-0.5 rounded-full">{wip.category}</span></td>
+                              <td className="py-3.5 px-4 text-center font-semibold text-slate-800">{wip.activeSlips} slips</td>
+                              <td className="py-3.5 px-4 text-right font-extrabold text-base text-slate-900">{wip.totalCompletedPieces.toLocaleString()} / {wip.totalTargetPieces.toLocaleString()} <span className="text-xs font-normal text-slate-500">pcs</span></td>
+                              <td className="py-3.5 px-4 text-right font-bold text-emerald-600">₹{wip.grossValue.toLocaleString()}</td>
+                            </tr>
+                          ))
+                        )}
                       </tbody>
                     </table>
                   </div>
@@ -1764,7 +1878,7 @@ const handleWhisperVoiceInput = async () => {
 
           </main>
 
-          {/* DISCREET FOOTER WITH DATA SOURCE SWITCHER FLAG */}
+          {/* FOOTER */}
           <footer className="mt-auto bg-slate-900 text-slate-400 text-xs py-4 border-t border-slate-800">
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center space-x-2">
@@ -1772,25 +1886,13 @@ const handleWhisperVoiceInput = async () => {
                 <span>• Pagdi Operations Portal</span>
               </div>
               
-              <div className="flex items-center space-x-2 bg-slate-800 p-1 rounded-xl border border-slate-700 text-[11px]">
-                <span className="text-slate-400 px-2 font-medium">Data Engine:</span>
-                <button
-                  onClick={() => setDataSourceMode('database')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition ${dataSourceMode === 'database' ? 'bg-emerald-500 text-slate-950 shadow' : 'text-slate-300 hover:text-white'}`}
-                >
-                  ☁️ Supabase Cloud DB
-                </button>
-                <button
-                  onClick={() => setDataSourceMode('mock')}
-                  className={`px-2.5 py-1 rounded-lg font-bold transition ${dataSourceMode === 'mock' ? 'bg-amber-500 text-amber-950 shadow' : 'text-slate-300 hover:text-white'}`}
-                >
-                  📦 LocalStorage (Mock)
-                </button>
+              <div className="flex items-center space-x-2 bg-slate-800 p-1.5 rounded-xl border border-slate-700 text-[11px]">
+                <span className="text-emerald-400 font-bold px-2">☁️ Supabase Cloud DB Active</span>
               </div>
             </div>
           </footer>
 
-          {/* WORK SLIP LIFECYCLE: LOG WORK CHUNK MODAL (IMMUTABLE BASELINE TASK MODEL) */}
+          {/* WORK SLIP LIFECYCLE: LOG WORK CHUNK MODAL */}
           {isProgressModalOpen && activeTaskToUpdate && (
             <div className="fixed inset-0 z-50 bg-slate-900/60 backdrop-blur-sm flex items-center justify-center p-4">
               <div className="bg-white rounded-2xl max-w-md w-full p-6 shadow-2xl border my-auto max-h-[85vh] overflow-y-auto">
@@ -1804,7 +1906,7 @@ const handleWhisperVoiceInput = async () => {
 
                 <form onSubmit={handleProgressSubmit} className="space-y-4">
                   <div className="bg-amber-50 p-3 rounded-xl border border-amber-200 text-xs space-y-1">
-                    <div className="flex justify-between"><span>Original Order Size (Immutable Target):</span><strong className="text-amber-950">{activeTaskToUpdate.piecesReceived} pcs</strong></div>
+                    <div className="flex justify-between"><span>Original Order Size (Target):</span><strong className="text-amber-950">{activeTaskToUpdate.piecesReceived} pcs</strong></div>
                     <div className="flex justify-between"><span>Current Completed Pieces:</span><strong className="text-amber-900">{getTaskCompletedPieces(activeTaskToUpdate.id)} pcs</strong></div>
                     <div className="flex justify-between"><span>Current Status:</span><strong className="text-amber-900">{activeTaskToUpdate.status}</strong></div>
                   </div>
@@ -1861,7 +1963,6 @@ const handleWhisperVoiceInput = async () => {
                     ></textarea>
                   </div>
 
-                  {/* PREVIOUS WORK CHUNKS LEDGER INSPECTOR */}
                   <div className="mt-3 pt-3 border-t">
                     <span className="text-[11px] font-bold text-slate-500 uppercase tracking-wider block mb-2">Previous Chunk Logs for this Slip:</span>
                     <div className="space-y-1.5 max-h-28 overflow-y-auto pr-1">
